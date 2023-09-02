@@ -1,6 +1,6 @@
 # MC1-Quake
 
-This is the classic game Quake (by id Software) ported to the [MRISC32](https://mrisc32.bitsnbites.eu/)-based computer [MC1](https://github.com/mrisc32/mc1).
+This is the classic game Quake (by id Software) ported to the [MRISC32](https://mrisc32.bitsnbites.eu/)-based computer [MC1](https://gitlab.com/mrisc32/mc1).
 
 ![mc1-quake](mc1-quake-400x364.jpg)
 
@@ -15,7 +15,7 @@ The source code is released under the GNU General Public License, as outlined in
 ## Building for MC1
 
 In order to build MC1-Quake for an MC1 target, you need the MRISC32 GNU
-toolchain installed. You can find it [here](https://github.com/mrisc32/mrisc32-gnu-toolchain).
+toolchain installed. You can find it [here](https://gitlab.com/mrisc32/mrisc32-gnu-toolchain).
 
 ```bash
 $ mkdir WinQuake/out
@@ -24,9 +24,9 @@ $ cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=../mc1-toolchain.cmake -DCMAKE_BUILD_TYP
 $ ninja
 ```
 
-The resulting ELF binary is `WinQuake/out/mc1quake`, which is runnable in the [MRISC32 simulator](https://github.com/mrisc32/mrisc32-simulator) (use `run.sh` or `run.bat` to run it).
+The resulting ELF binary is `WinQuake/out/mc1quake`, which is runnable in the [MRISC32 simulator](https://gitlab.com/mrisc32/mrisc32-simulator) (use `run.sh` or `run.bat` to run it).
 
-To build for an MC1 computer target, install the [MC1 SDK](https://github.com/mrisc32/mc1-sdk) and add `-DMC1SDK_HOME=/path/to/mc1-sdk-installation` to the CMake options.
+To build for an MC1 computer target, install the [MC1 SDK](https://gitlab.com/mrisc32/mc1-sdk) and add `-DMC1SDK_HOME=/path/to/mc1-sdk-installation` to the CMake options.
 
 ## Building for other platforms
 
