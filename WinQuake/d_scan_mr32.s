@@ -418,7 +418,7 @@ D_DrawTurbulent8Span:
     add     v2, v2, r4
 
     ; while (--r_turb_spancount > 0)
-    bgt     r5, 1b
+    bgtz    r5, 1b
 #else
 #error "Support for non-vectorized operation not implemented yet"
 #endif
@@ -452,8 +452,8 @@ D_DrawTurbulent8Span:
     .type       D_WarpScreenKernel, @function
 
 D_WarpScreenKernel:
-    ble     r2, 3f
-    ble     r1, 3f
+    blez    r2, 3f
+    blez    r1, 3f
 
     mov     r10, r3                 ; r10 = &turb[v]
 
@@ -483,7 +483,7 @@ D_WarpScreenKernel:
     ldea    r11, [r11, vl*4]        ; turb++
     ldea    r9, [r9, vl*4]          ; col++
 
-    bgt     r8, 2b
+    bgtz    r8, 2b
 #else
 #error "Support for non-vectorized operation not implemented yet"
 #endif
@@ -492,7 +492,7 @@ D_WarpScreenKernel:
     add     r4, r4, #4              ; rowptr++
 
     add     r2, r2, #-1
-    bgt     r2, 1b
+    bgtz    r2, 1b
 
 3:
     ret
