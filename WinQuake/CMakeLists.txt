@@ -71,10 +71,8 @@ set(SRCS
 
 if(MC1)
   list(APPEND DEFS -DMC1)
-  list(APPEND OPTS -mcmodel=small)
-  list(APPEND LIBS
-       m
-  )
+  list(APPEND OPTS -mcmodel=small -flto)
+  list(APPEND LIBS m -flto)
   if(MC1SDK_HOME)
     message("Building for running on an MC1 computer.")
     list(APPEND DEFS
