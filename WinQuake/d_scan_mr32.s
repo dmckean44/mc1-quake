@@ -259,6 +259,227 @@ D_DrawSpans8:
 
 
 ;-----------------------------------------------------------------------------
+; void D_DrawSpans16 (espan_t *pspan)
+;
+; Same as D_DrawSpans8 but with 16-pixel subdivision. The perspective divide
+; for the next subspan is done with frecipa + one Newton-Raphson step, which
+; is interleaved with the vector drawing of the current subspan so that its
+; latency is hidden. The divisions for the last subspan of each span use a
+; reciprocal table instead of the (stalling) divider.
+;
+; r1 = pspan
+;-----------------------------------------------------------------------------
+
+#ifdef __MRISC32_HARD_FLOAT__
+
+    .p2align    5
+    .global     D_DrawSpans16
+    .type       D_DrawSpans16, @function
+
+D_DrawSpans16:
+    stw     lr, [sp, #-4]
+    stw     fp, [sp, #-8]
+    stw     tp, [sp, #-12]
+    stw     r26, [sp, #-16]
+    stw     r25, [sp, #-20]
+    stw     r24, [sp, #-24]
+    stw     r23, [sp, #-28]
+    stw     r22, [sp, #-32]
+    stw     r21, [sp, #-36]
+    stw     r20, [sp, #-40]
+    stw     r19, [sp, #-44]
+    stw     r18, [sp, #-48]
+    stw     r17, [sp, #-52]
+    stw     r16, [sp, #-56]
+
+    ldwpc   r2, #cacheblock@pc              ; r2 = pbase
+    ldwpc   r5, #d_sdivzstepu@pc
+    ldwpc   r6, #d_tdivzstepu@pc
+    ldwpc   r7, #d_zistepu@pc
+    ldwpc   r8, #sadjust@pc
+    ldwpc   r9, #tadjust@pc
+    ldwpc   r10, #bbextents@pc
+    ldwpc   r11, #bbextentt@pc
+    ldwpc   r12, #cachewidth@pc
+    ldi     tp, #0x40000000                 ; 2.0
+    ldi     fp, #0x47800000                 ; 65536.0
+
+    ; r3 = pdest, r13 = pixels left after the current subspan
+    ; r15/r16 = s/t, r17/r18 = sstep/tstep, r19/r20 = s/t at the subspan target
+    ; r21/r22/r23 = s/z, t/z, 1/z at the subspan target
+1:
+    ldw     r13, [r1, #espan_t_v]
+    ldw     r14, [r1, #espan_t_u]
+    ldwpc   r4, #screenwidth@pc
+    ldwpc   r3, #d_viewbuffer@pc
+    mul     r15, r13, r4
+    itof    r13, r13, z                     ; dv
+    add     r15, r15, r14
+    itof    r14, r14, z                     ; du
+    ldea    r3, [r3, r15]
+
+    ldwpc   r24, #d_sdivzstepv@pc
+    ldwpc   r25, #d_tdivzstepv@pc
+    ldwpc   r26, #d_zistepv@pc
+    fmul    r21, r13, r24
+    fmul    r22, r13, r25
+    fmul    r23, r13, r26
+    fmul    r24, r14, r5
+    fmul    r25, r14, r6
+    fmul    r26, r14, r7
+    ldwpc   lr, #d_sdivzorigin@pc
+    fadd    r21, r21, r24
+    fadd    r22, r22, r25
+    fadd    r23, r23, r26
+    ldwpc   r24, #d_tdivzorigin@pc
+    ldwpc   r25, #d_ziorigin@pc
+    fadd    r21, r21, lr
+    fadd    r22, r22, r24
+    fadd    r23, r23, r25
+
+    ldi     lr, #0x47800000
+    fdiv    r14, lr, r23                    ; z = 65536 / zi
+    fmul    r15, r21, r14
+    fmul    r16, r22, r14
+    ftoi    r15, r15, z
+    ftoi    r16, r16, z
+    add     r15, r15, r8
+    max     r15, r15, #0
+    min     r15, r15, r10                   ; s
+    add     r16, r16, r9
+    max     r16, r16, #0
+    min     r16, r16, r11                   ; t
+
+    ldw     r13, [r1, #espan_t_count]
+    minu    r24, r13, #16
+    sub     r13, r13, r24
+    mov     vl, r24
+    seq     r26, r13, z
+    add     r26, r24, r26                   ; d = pixels to the subspan target
+
+    itof    r25, r26, z
+    fmul    r14, r25, r5
+    fmul    lr, r25, r6
+    fmul    r25, r25, r7
+    fadd    r21, r21, r14
+    fadd    r22, r22, lr
+    fadd    r23, r23, r25
+    ldi     lr, #0x47800000
+    fdiv    r14, lr, r23
+    fmul    r19, r21, r14
+    fmul    r20, r22, r14
+    ftoi    r19, r19, z
+    ftoi    r20, r20, z
+    add     r19, r19, r8
+    max     r19, r19, #16
+    min     r19, r19, r10
+    add     r20, r20, r9
+    max     r20, r20, #16
+    min     r20, r20, r11
+
+    ; Steps for the current subspan (d in r26).
+4:
+    sub     r17, r19, r15
+    sub     r18, r20, r16
+    bz      r13, 5f
+    asr     r17, r17, #4
+    asr     r18, r18, #4
+
+    ; Draw the current subspan while computing the target of the next one.
+2:
+    bz      r13, 3f
+    minu    r24, r13, #16
+    sub     r13, r13, r24
+    seq     r26, r13, z
+    add     r26, r24, r26
+    itof    r25, r26, z
+
+    ldea    v1, [r15, r17]
+    fmul    r14, r25, r5
+    fmul    lr, r25, r6
+    fmul    r25, r25, r7
+    ldea    v2, [r16, r18]
+    fadd    r21, r21, r14
+    fadd    r22, r22, lr
+    fadd    r23, r23, r25
+    lsr     v1, v1, #16
+    frecipa r14, r23
+    fmul    lr, r23, r14
+    lsr     v2, v2, #16
+    fsub    lr, tp, lr
+    madd    v1, v2, r12
+    fmul    r14, r14, lr
+    ldub    v1, [r2, v1]
+    fmul    r14, r14, fp
+    stb     v1, [r3, #1]
+    fmul    lr, r21, r14
+    fmul    r14, r22, r14
+    ldea    r3, [r3, vl]
+    mov     r15, r19
+    mov     r16, r20
+    ftoi    lr, lr, z
+    ftoi    r14, r14, z
+    mov     vl, r24
+    add     r19, lr, r8
+    max     r19, r19, #16
+    min     r19, r19, r10
+    add     r20, r14, r9
+    max     r20, r20, #16
+    min     r20, r20, r11
+    b       4b
+
+    ; The last subspan: step = delta / d, using mulhi with floor(2^32 / d).
+5:
+    addpc   r25, #D_Recip16@pc
+    ldw     r25, [r25, r26*4]
+    mulhi   r14, r17, r25
+    mulhi   lr, r18, r25
+    seq     r24, r26, #1
+    mov     r25, r24
+    sel     r24, r17, r14
+    sel     r25, r18, lr
+    mov     r17, r24
+    mov     r18, r25
+
+3:
+    ldea    v1, [r15, r17]
+    ldea    v2, [r16, r18]
+    lsr     v1, v1, #16
+    lsr     v2, v2, #16
+    madd    v1, v2, r12
+    ldub    v1, [r2, v1]
+    stb     v1, [r3, #1]
+
+    ldw     r1, [r1, #espan_t_pnext]
+    bnz     r1, 1b
+
+    ldw     lr, [sp, #-4]
+    ldw     fp, [sp, #-8]
+    ldw     tp, [sp, #-12]
+    ldw     r26, [sp, #-16]
+    ldw     r25, [sp, #-20]
+    ldw     r24, [sp, #-24]
+    ldw     r23, [sp, #-28]
+    ldw     r22, [sp, #-32]
+    ldw     r21, [sp, #-36]
+    ldw     r20, [sp, #-40]
+    ldw     r19, [sp, #-44]
+    ldw     r18, [sp, #-48]
+    ldw     r17, [sp, #-52]
+    ldw     r16, [sp, #-56]
+    ret
+
+    .size   D_DrawSpans16, .-D_DrawSpans16
+
+    .p2align    2
+D_Recip16:
+    .word   0, 0, 0x7fffffff, 0x55555555, 0x40000000, 0x33333333, 0x2aaaaaaa, 0x24924924
+    .word   0x20000000, 0x1c71c71c, 0x19999999, 0x1745d174, 0x15555555, 0x13b13b13, 0x12492492, 0x11111111
+
+#endif  /* __MRISC32_HARD_FLOAT__ */
+
+
+;-----------------------------------------------------------------------------
 ; void D_DrawZSpans (espan_t *pspan)
 ;
 ; r1 = pspan
