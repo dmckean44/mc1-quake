@@ -37,10 +37,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // Memory config.
 #define SURFCACHE_SIZE_MB 8
 
-// Video buffers.
-static byte *s_vcp;
+// Video buffers. With two framebuffers we draw straight into the hidden one.
+static byte *s_vcp[2];
 static byte *s_palette;
-static byte *s_framebuffer;
+static byte *s_framebuffer[2];
+static int s_numpages;
+static int s_backpage;
 
 // Quake working buffers.
 static byte *s_vbuffer;
@@ -107,7 +109,7 @@ static void MC1_Free (byte *ptr)
 		free (ptr);
 }
 
-static void VID_CreateVCP (void)
+static void VID_CreateVCP (int page)
 {
 	// Get the native video signal resolution and calculate the scaling factors.
 	unsigned native_width = GET_MMIO (VIDWIDTH);
@@ -116,14 +118,14 @@ static void VID_CreateVCP (void)
 	unsigned yincr = ((native_height - 1) << 16) / (BASEHEIGHT - 1);
 
 	// Frame configuraiton.
-	unsigned *vcp = (unsigned *)s_vcp;
+	unsigned *vcp = (unsigned *)s_vcp[page];
 	*vcp++ = VCP_SETREG (VCR_XINCR, xincr);
 	*vcp++ = VCP_SETREG (VCR_CMODE, CMODE_PAL8);
 	*vcp++ = VCP_JSR (s_palette);
 
 	// Generate lines.
 	unsigned y = 0;
-	unsigned addr = (unsigned)s_framebuffer;
+	unsigned addr = (unsigned)s_framebuffer[page];
 	for (int i = 0; i < BASEHEIGHT; ++i)
 	{
 		if (i == 0)
@@ -136,18 +138,19 @@ static void VID_CreateVCP (void)
 
 	// End of frame (wait forever).
 	*vcp = VCP_WAITY (32767);
+}
 
-	// Palette.
+static void VID_ShowPage (int page)
+{
+	*((unsigned *)0x40000010) = VCP_JMP (s_vcp[page]);
+}
+
+static void VID_CreatePalette (void)
+{
 	unsigned *palette = (unsigned *)s_palette;
 	*palette++ = VCP_SETPAL (0, 256);
 	palette += 256;
 	*palette = VCP_RTS;
-
-	// Configure the main layer 1 VCP to call our VCP.
-	*((unsigned *)0x40000010) = VCP_JMP (s_vcp);
-
-	// The layer 2 VCP should do nothing.
-	*((unsigned *)0x40000020) = VCP_WAITY (32767);
 }
 
 void VID_SetPalette (unsigned char *palette)
@@ -180,22 +183,34 @@ void VID_Init (unsigned char *palette)
 	const size_t vcp_size = (5 + BASEHEIGHT * 2) * sizeof (unsigned);
 	const size_t palette_size = (2 + 256) * sizeof (unsigned);
 	const size_t framebuffer_size = BASEWIDTH * BASEHEIGHT * sizeof (byte);
-	s_vcp = MC1_VRAM_Alloc (vcp_size);
 	s_palette = MC1_VRAM_Alloc (palette_size);
-	s_framebuffer = MC1_VRAM_Alloc (framebuffer_size);
-	if (s_framebuffer == NULL)
+	s_vcp[0] = MC1_VRAM_Alloc (vcp_size);
+	s_framebuffer[0] = MC1_VRAM_Alloc (framebuffer_size);
+	if (s_framebuffer[0] == NULL)
 	{
 		printf ("Error: Not enough VRAM!\n");
 		exit (1);
 	}
+	s_vcp[1] = MC1_VRAM_Alloc (vcp_size);
+	s_framebuffer[1] = MC1_VRAM_Alloc (framebuffer_size);
+	s_numpages = s_framebuffer[1] ? 2 : 1;
 
 	// Allocate memory for the various buffers that Quake needs.
 	const size_t vbuffer_size = BASEWIDTH * BASEHEIGHT * sizeof (byte);
 	const size_t zbuffer_size = BASEWIDTH * BASEHEIGHT * sizeof (short);
 	const size_t surfcache_size = SURFCACHE_SIZE_MB * 1024 * 1024 * sizeof (byte);
-	s_vbuffer = MC1_Alloc (vbuffer_size);
-	if (MC1_IsVRAMPtr (s_vbuffer))
-		Con_Printf ("Using VRAM for the pixel buffer\n");
+	if (s_numpages == 2)
+	{
+		s_backpage = 1;
+		s_vbuffer = s_framebuffer[s_backpage];
+		Con_Printf ("Page flipping between two VRAM framebuffers\n");
+	}
+	else
+	{
+		s_vbuffer = MC1_Alloc (vbuffer_size);
+		if (MC1_IsVRAMPtr (s_vbuffer))
+			Con_Printf ("Using VRAM for the pixel buffer\n");
+	}
 	s_zbuffer = MC1_Alloc (zbuffer_size);
 	if (MC1_IsVRAMPtr (s_zbuffer))
 		Con_Printf ("Using VRAM for the Z buffer\n");
@@ -209,19 +224,24 @@ void VID_Init (unsigned char *palette)
 		"          Palette     @ 0x%08x (%d)\n",
 		BASEWIDTH,
 		BASEHEIGHT,
-		(unsigned)s_framebuffer,
-		(unsigned)s_framebuffer,
+		(unsigned)s_framebuffer[0],
+		(unsigned)s_framebuffer[0],
 		(unsigned)(s_palette + 4),
 		(unsigned)(s_palette + 4));
 
-	// Create the VCP.
-	VID_CreateVCP ();
+	VID_CreatePalette ();
+	for (int page = 0; page < s_numpages; ++page)
+		VID_CreateVCP (page);
+	VID_ShowPage (0);
+
+	// The layer 2 VCP should do nothing.
+	*((unsigned *)0x40000020) = VCP_WAITY (32767);
 
 	// Set up the vid structure that is used by the Quake rendering engine.
 	vid.maxwarpwidth = vid.width = vid.conwidth = BASEWIDTH;
 	vid.maxwarpheight = vid.height = vid.conheight = BASEHEIGHT;
 	vid.aspect = 1.0;
-	vid.numpages = 1;
+	vid.numpages = s_numpages;
 	vid.colormap = host_colormap;
 	vid.fullbright = 256 - LittleLong (*((int *)vid.colormap + 2048));
 	vid.buffer = vid.conbuffer = s_vbuffer;
@@ -236,7 +256,8 @@ void VID_Shutdown (void)
 {
 	MC1_Free (s_surfcache);
 	MC1_Free (s_zbuffer);
-	MC1_Free (s_vbuffer);
+	if (s_numpages == 1)
+		MC1_Free (s_vbuffer);
 }
 
 static void VID_DumpFrame (void)
@@ -265,6 +286,15 @@ void VID_Update (vrect_t *rects)
 	vrect_t *rect;
 
 	VID_DumpFrame ();
+
+	if (s_numpages == 2)
+	{
+		VID_ShowPage (s_backpage);
+		s_backpage ^= 1;
+		vid.buffer = vid.conbuffer = s_framebuffer[s_backpage];
+		return;
+	}
+
 	for (rect = rects; rect != NULL; rect = rect->pnext)
 	{
 		size_t bytes_per_row = rect->width;
@@ -272,7 +302,7 @@ void VID_Update (vrect_t *rects)
 		const byte *src = vid.buffer + rect->y * BASEWIDTH + rect->x;
 		unsigned i;
 
-		byte *dst = s_framebuffer + rect->y * BASEWIDTH + rect->x;
+		byte *dst = s_framebuffer[0] + rect->y * BASEWIDTH + rect->x;
 		if (bytes_per_row == BASEWIDTH)
 		{
 			bytes_per_row *= num_rows;
