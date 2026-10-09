@@ -19,6 +19,23 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "quakedef.h"
+#ifdef MC1
+#include "mc1.h"
+#endif
+
+static void Prof_Mark (const char *tag)
+{
+#ifdef MC1
+	unsigned hi1, lo, hi2;
+	do
+	{
+		hi1 = GET_MMIO (CLKCNTHI);
+		lo = GET_MMIO (CLKCNTLO);
+		hi2 = GET_MMIO (CLKCNTHI);
+	} while (hi1 != hi2);
+	printf ("%s cycles=%llu frames=%d\n", tag, ((unsigned long long)hi1 << 32) | lo, host_framecount);
+#endif
+}
 
 void CL_FinishTimeDemo (void);
 
@@ -105,7 +122,10 @@ int CL_GetMessage (void)
 			// if this is the second frame, grab the real td_starttime
 			// so the bogus time on the first frame doesn't count
 				if (host_framecount == cls.td_startframe + 1)
+				{
 					cls.td_starttime = realtime;
+					Prof_Mark ("TIMEDEMO_START");
+				}
 			}
 			else if ( /* cl.time > 0 && */ cl.time <= cl.mtime[0])
 			{
@@ -335,6 +355,9 @@ void CL_FinishTimeDemo (void)
 	if (!time)
 		time = 1;
 	Con_Printf ("%i frames %5.1f seconds %5.1f fps\n", frames, time, frames/time);
+	Prof_Mark ("TIMEDEMO_END");
+	if (COM_CheckParm ("-tdquit"))
+		Sys_Quit ();
 }
 
 /*
