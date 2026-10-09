@@ -133,6 +133,7 @@ cvar_t	r_reportedgeout = {"r_reportedgeout", "0"};
 cvar_t	r_maxedges = {"r_maxedges", "0"};
 cvar_t	r_numedges = {"r_numedges", "0"};
 cvar_t	r_aliastransbase = {"r_aliastransbase", "200"};
+cvar_t	r_lodsize = {"r_lodsize", "48", true};
 cvar_t	r_aliastransadj = {"r_aliastransadj", "100"};
 
 extern cvar_t	scr_fov;
@@ -210,6 +211,7 @@ void R_Init (void)
 	Cvar_RegisterVariable (&r_maxedges);
 	Cvar_RegisterVariable (&r_numedges);
 	Cvar_RegisterVariable (&r_aliastransbase);
+	Cvar_RegisterVariable (&r_lodsize);
 	Cvar_RegisterVariable (&r_aliastransadj);
 
 	Cvar_SetValue ("r_maxedges", (float)NUMSTACKEDGES);

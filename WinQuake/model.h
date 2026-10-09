@@ -361,6 +361,8 @@ typedef struct model_s
 	byte		*lightdata;
 	char		*entities;
 
+	struct model_s	*lod;		// simplified alias model for distant views
+
 //
 // additional model data
 //

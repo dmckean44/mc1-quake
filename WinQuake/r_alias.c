@@ -695,6 +695,20 @@ void R_AliasSetupFrame (void)
 }
 
 
+static model_t *R_AliasLodModel (void)
+{
+	model_t	*mod = currententity->model;
+	vec3_t	delta;
+
+	if (mod->lod && r_lodsize.value > 0 && currententity != &cl.viewent)
+	{
+		VectorSubtract (currententity->origin, r_origin, delta);
+		if (DotProduct (delta, vpn) * r_lodsize.value > 64.0f * xscale)
+			return mod->lod;
+	}
+	return mod;
+}
+
 /*
 ================
 R_AliasDrawModel
@@ -713,7 +727,7 @@ void R_AliasDrawModel (alight_t *plighting)
 			(((long)&finalverts[0] + CACHE_SIZE - 1) & ~(CACHE_SIZE - 1));
 	pauxverts = &auxverts[0];
 
-	paliashdr = (aliashdr_t *)Mod_Extradata (currententity->model);
+	paliashdr = (aliashdr_t *)Mod_Extradata (R_AliasLodModel ());
 	pmdl = (mdl_t *)((byte *)paliashdr + paliashdr->model);
 
 	R_AliasSetupSkin ();
