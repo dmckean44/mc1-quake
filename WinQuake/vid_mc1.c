@@ -54,6 +54,8 @@ extern viddef_t vid;
 unsigned short d_8to16table[256];
 unsigned d_8to24table[256];
 
+static cvar_t vid_dumpframes = {"vid_dumpframes", "0"};
+
 // Pointers for the custom VRAM allocator.
 static byte *s_vram_alloc_ptr;
 static byte *s_vram_alloc_end;
@@ -226,6 +228,7 @@ void VID_Init (unsigned char *palette)
 	vid.rowbytes = vid.conrowbytes = BASEWIDTH;
 
 	d_pzbuffer = (short *)s_zbuffer;
+	Cvar_RegisterVariable (&vid_dumpframes);
 	D_InitCaches (s_surfcache, surfcache_size);
 }
 
@@ -236,9 +239,32 @@ void VID_Shutdown (void)
 	MC1_Free (s_vbuffer);
 }
 
+static void VID_DumpFrame (void)
+{
+	static int frameno;
+	char name[32];
+	FILE *f;
+	int w = BASEWIDTH, h = BASEHEIGHT;
+
+	frameno++;
+	if (vid_dumpframes.value <= 0 || frameno % (int)vid_dumpframes.value)
+		return;
+	snprintf (name, sizeof (name), "frame_%05d.raw", frameno);
+	f = fopen (name, "wb");
+	if (!f)
+		return;
+	fwrite (&w, 4, 1, f);
+	fwrite (&h, 4, 1, f);
+	fwrite (&((unsigned *)s_palette)[1], 4, 256, f);
+	fwrite (vid.buffer, 1, w * h, f);
+	fclose (f);
+}
+
 void VID_Update (vrect_t *rects)
 {
 	vrect_t *rect;
+
+	VID_DumpFrame ();
 	for (rect = rects; rect != NULL; rect = rect->pnext)
 	{
 		size_t bytes_per_row = rect->width;
