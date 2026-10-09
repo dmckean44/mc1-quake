@@ -261,11 +261,11 @@ D_DrawSpans8:
 ;-----------------------------------------------------------------------------
 ; void D_DrawSpans16 (espan_t *pspan)
 ;
-; Same as D_DrawSpans8 but with 16-pixel subdivision. The perspective divide
-; for the next subspan is done with frecipa + one Newton-Raphson step, which
-; is interleaved with the vector drawing of the current subspan so that its
-; latency is hidden. The divisions for the last subspan of each span use a
-; reciprocal table instead of the (stalling) divider.
+; Same as D_DrawSpans8 but with 16-pixel subdivision and no use of the
+; (stalling) divider: perspective divides are done with frecipa + one
+; Newton-Raphson step, interleaved with the vector drawing of the current
+; subspan so that their latency is hidden, and the steps of the last subspan
+; of each span use a reciprocal table.
 ;
 ; r1 = pspan
 ;-----------------------------------------------------------------------------
@@ -337,19 +337,6 @@ D_DrawSpans16:
     fadd    r22, r22, r24
     fadd    r23, r23, r25
 
-    ldi     lr, #0x47800000
-    fdiv    r14, lr, r23                    ; z = 65536 / zi
-    fmul    r15, r21, r14
-    fmul    r16, r22, r14
-    ftoi    r15, r15, z
-    ftoi    r16, r16, z
-    add     r15, r15, r8
-    max     r15, r15, #0
-    min     r15, r15, r10                   ; s
-    add     r16, r16, r9
-    max     r16, r16, #0
-    min     r16, r16, r11                   ; t
-
     ldw     r13, [r1, #espan_t_count]
     minu    r24, r13, #16
     sub     r13, r13, r24
@@ -357,17 +344,40 @@ D_DrawSpans16:
     seq     r26, r13, z
     add     r26, r24, r26                   ; d = pixels to the subspan target
 
+    ; Reciprocals of 1/z at the span start and at the first target, two
+    ; interleaved Newton-Raphson chains instead of two stalling divides.
     itof    r25, r26, z
-    fmul    r14, r25, r5
-    fmul    lr, r25, r6
-    fmul    r25, r25, r7
-    fadd    r21, r21, r14
-    fadd    r22, r22, lr
-    fadd    r23, r23, r25
-    ldi     lr, #0x47800000
-    fdiv    r14, lr, r23
-    fmul    r19, r21, r14
-    fmul    r20, r22, r14
+    frecipa r14, r23
+    fmul    lr, r23, r14
+    fmul    r17, r25, r5
+    fmul    r18, r25, r6
+    fmul    r24, r25, r7
+    fsub    lr, tp, lr
+    fadd    r17, r21, r17                   ; s/z at the target
+    fadd    r18, r22, r18                   ; t/z at the target
+    fadd    r24, r23, r24                   ; 1/z at the target
+    fmul    r14, r14, lr
+    frecipa r25, r24
+    fmul    lr, r24, r25
+    fmul    r14, r14, fp                    ; z at the start
+    fsub    lr, tp, lr
+    fmul    r15, r21, r14
+    fmul    r16, r22, r14
+    fmul    r25, r25, lr
+    ftoi    r15, r15, z
+    ftoi    r16, r16, z
+    fmul    r25, r25, fp                    ; z at the target
+    add     r15, r15, r8
+    max     r15, r15, #0
+    min     r15, r15, r10                   ; s
+    add     r16, r16, r9
+    max     r16, r16, #0
+    min     r16, r16, r11                   ; t
+    fmul    r19, r17, r25
+    fmul    r20, r18, r25
+    mov     r21, r17
+    mov     r22, r18
+    mov     r23, r24
     ftoi    r19, r19, z
     ftoi    r20, r20, z
     add     r19, r19, r8
