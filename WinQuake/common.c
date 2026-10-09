@@ -1609,6 +1609,37 @@ byte *COM_LoadStackFile (char *path, void *buffer, int bufsize)
 }
 
 /*
+===========
+COM_FileExists
+
+Like COM_FindFile, but quiet and without opening anything
+===========
+*/
+qboolean COM_FileExists (char *filename)
+{
+	searchpath_t	*search;
+	char			netpath[MAX_OSPATH];
+	int				i;
+
+	for (search = com_searchpaths ; search ; search = search->next)
+	{
+		if (search->pack)
+		{
+			for (i=0 ; i<search->pack->numfiles ; i++)
+				if (!strcmp (search->pack->files[i].name, filename))
+					return true;
+		}
+		else if (static_registered || !strchr (filename, '/'))
+		{
+			sprintf (netpath, "%s/%s", search->filename, filename);
+			if (Sys_FileTime (netpath) != -1)
+				return true;
+		}
+	}
+	return false;
+}
+
+/*
 =================
 COM_LoadPackFile
 
@@ -1718,6 +1749,19 @@ void COM_AddGameDirectory (char *dir)
 		search->pack = pak;
 		search->next = com_searchpaths;
 		com_searchpaths = search;               
+	}
+
+// optional simplified models (see tools/mdllod)
+	for (i=0 ; i<2 ; i++)
+	{
+		sprintf (pakfile, "%s/%s", dir, i ? "lod.pak" : "lowpoly.pak");
+		pak = COM_LoadPackFile (pakfile);
+		if (!pak)
+			continue;
+		search = Hunk_Alloc (sizeof(searchpath_t));
+		search->pack = pak;
+		search->next = com_searchpaths;
+		com_searchpaths = search;
 	}
 
 //

@@ -198,6 +198,31 @@ void CL_KeepaliveMessage (void)
 
 /*
 ==================
+CL_LoadModelLod
+
+Picks up "foo_lod.mdl" next to "foo.mdl" if the game data has one
+==================
+*/
+static void CL_LoadModelLod (model_t *mod)
+{
+	char	name[MAX_QPATH];
+	size_t	len = strlen (mod->name);
+
+	mod->lod = NULL;
+	if (mod->type != mod_alias || len < 5 || len + 4 >= sizeof (name) ||
+		strcmp (mod->name + len - 4, ".mdl"))
+		return;
+	memcpy (name, mod->name, len - 4);
+	strcpy (name + len - 4, "_lod.mdl");
+	if (!COM_FileExists (name))
+		return;
+	mod->lod = Mod_ForName (name, false);
+	if (mod->lod && mod->lod->numframes != mod->numframes)
+		mod->lod = NULL;
+}
+
+/*
+==================
 CL_ParseServerInfo
 ==================
 */
@@ -295,6 +320,8 @@ void CL_ParseServerInfo (void)
 		}
 		CL_KeepaliveMessage ();
 	}
+	for (i=1 ; i<nummodels ; i++)
+		CL_LoadModelLod (cl.model_precache[i]);
 
 	S_BeginPrecaching ();
 	for (i=1 ; i<numsounds ; i++)
