@@ -32,7 +32,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // Video resolution (hardcoded).
 #define BASEWIDTH 320
+#ifndef BASEHEIGHT
 #define BASEHEIGHT ((BASEWIDTH * 9 + 8) / 16)
+#endif
 
 // Memory config.
 #define SURFCACHE_SIZE_MB 8
