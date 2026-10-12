@@ -408,8 +408,7 @@ static void PE_EndLitSurface (void)
 ================
 PE_DrawSurfaceBlocks
 
-R_DrawSurface on the pixel engine. Its blocks interpolate the light from the
-left edge, ours from the right, so texels can differ by one light step.
+R_DrawSurface on the pixel engine.
 ================
 */
 void PE_DrawSurfaceBlocks (void)
@@ -444,7 +443,7 @@ void PE_DrawSurfaceBlocks (void)
 	PE_Ptr (source + toffset * texwidth);
 	PE_Word (numh);
 	PE_Word (numv);
-	PE_Word (level);
+	PE_Word (level);	/* r_surf_mr32.s lights rows from the left, as the engine does */
 	PE_Ptr (r_drawsurf.surfdat);
 	PE_Word (r_drawsurf.rowbytes);
 	if (lit)
