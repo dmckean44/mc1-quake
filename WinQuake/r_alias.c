@@ -98,7 +98,8 @@ qboolean R_AliasCheckBBox (void)
 	auxvert_t			*pa0, *pa1, viewaux[16];
 	maliasframedesc_t	*pframedesc;
 	qboolean			zclipped, zfullyclipped;
-	unsigned			anyclip, allclip;
+	unsigned			anyclip, allclip, guardclip;
+	qboolean			guard;
 	int					minz;
 	
 // expand, rotate, and translate points into worldspace
@@ -202,6 +203,10 @@ qboolean R_AliasCheckBBox (void)
 // project the vertices that remain after clipping
 	anyclip = 0;
 	allclip = ALIAS_XY_CLIP_MASK;
+	guardclip = 0;
+	/* the engine clips to the screen: in its guard band, models that only
+	   leave the screen count as unclipped */
+	guard = pe_guard_models && currententity->colormap == vid.colormap;
 
 // TODO: probably should do this loop in ASM, especially if we use floats
 	for (i=0 ; i<numv ; i++)
@@ -229,12 +234,18 @@ qboolean R_AliasCheckBBox (void)
 
 		anyclip |= flags;
 		allclip &= flags;
+
+		if (guard && (v0 < xcenter - PE_GUARD * (xcenter - r_refdef.fvrectx) ||
+				v0 > xcenter + PE_GUARD * (r_refdef.fvrectright - xcenter) ||
+				v1 < ycenter - PE_GUARD * (ycenter - r_refdef.fvrecty) ||
+				v1 > ycenter + PE_GUARD * (r_refdef.fvrectbottom - ycenter)))
+			guardclip = 1;
 	}
 
 	if (allclip)
 		return false;	// trivial reject off one side
 
-	currententity->trivial_accept = !anyclip & !zclipped;
+	currententity->trivial_accept = !(guard ? guardclip : anyclip) & !zclipped;
 
 	if (currententity->trivial_accept)
 	{
@@ -533,6 +544,31 @@ void R_AliasProjectFinalVert (finalvert_t *fv, auxvert_t *av)
 R_AliasPrepareUnclippedPoints
 ================
 */
+/* the engine transforms, projects and lights the vertices (version 9) */
+static void PE_AliasVerts (finalvert_t *fv, stvert_t *pstverts)
+{
+	int	i, j;
+
+	PE_Begin (PE_VERTS, 24);
+	PE_Ptr (r_apverts);
+	PE_Word (r_anumverts);
+	PE_Ptr (fv);
+	for (i = 0; i < 3; i++)
+	{
+		for (j = 0; j < 4; j++)
+			PE_Float (aliastransform[i][j]);
+	}
+	PE_Float (aliasxcenter);
+	PE_Float (aliasycenter);
+	PE_Ptr (r_avertexnormals);
+	PE_Float (r_plightvec[0]);
+	PE_Float (r_plightvec[1]);
+	PE_Float (r_plightvec[2]);
+	PE_Word (r_ambientlight);
+	PE_Float (r_shadelight);
+	PE_Ptr (pstverts);
+}
+
 void R_AliasPrepareUnclippedPoints (void)
 {
 	stvert_t	*pstverts;
@@ -543,7 +579,10 @@ void R_AliasPrepareUnclippedPoints (void)
 // FIXME: just use pfinalverts directly?
 	fv = pfinalverts;
 
-	R_AliasTransformAndProjectFinalVerts (fv, pstverts);
+	if (pe_mesh && pe_version >= 9)
+		PE_AliasVerts (fv, pstverts);
+	else
+		R_AliasTransformAndProjectFinalVerts (fv, pstverts);
 
 	if (pe_mesh && PE_DrawMesh (pfinalverts, (mtriangle_t *)((byte *)paliashdr + paliashdr->triangles),
 			pmdl->numtris, r_affinetridesc.seamfixupX16))

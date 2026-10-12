@@ -97,6 +97,10 @@ typedef struct clipplane_s
 
 extern	clipplane_t	view_clipplanes[4];
 
+/* guard band: the pixel engine clips models to the screen up to this many
+   times its half width or height from the centre */
+#define PE_GUARD	2.0f
+
 //=============================================================================
 
 void R_RenderWorld (void);
