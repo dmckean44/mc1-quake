@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include "d_local.h"	// FIXME: shouldn't be needed (is needed for patch
+#include "d_pe.h"
 						// right now, but that should move)
 
 #define LIGHT_MIN	5		// lowest light value we'll allow, to avoid the
@@ -753,6 +754,12 @@ void R_AliasDrawModel (alight_t *plighting)
 	}
 
 	acolormap = currententity->colormap;
+
+	pe_alias = pe_active && acolormap == vid.colormap;
+	if (pe_alias)
+		PE_SetSkin (r_affinetridesc.pskin, r_affinetridesc.skinwidth);
+	else
+		PE_Finish ();
 
 	if (currententity != &cl.viewent)
 		ziscale = (float)0x8000 * (float)0x10000;

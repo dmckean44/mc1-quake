@@ -38,6 +38,8 @@ typedef struct surfcache_s
 {
 	struct surfcache_s	*next;
 	struct surfcache_s 	**owner;		// NULL is an empty chunk of memory
+	unsigned		pe_fence;	// last pixel engine command using this block
+	unsigned		pe_valid;	// 0 while a deferred build may have been dropped
 	int					lightadj[MAXLIGHTMAPS]; // checked for strobe flush
 	int					dlight;
 	int					size;		// including header

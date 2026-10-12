@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include "d_local.h"
+#include "d_pe.h"
 
 // TODO: put in span spilling to shrink list size
 // !!! if this is changed, it must be changed in d_polysa.s too !!!
@@ -122,11 +123,45 @@ void D_PolysetScanLeftEdge (int height);
 D_PolysetDraw
 ================
 */
+/* the opaque model triangles go to the pixel engine, which rasterizes them
+   as D_DrawNonSubdiv does */
+static void PE_PolysetDraw (void)
+{
+	mtriangle_t	*ptri = r_affinetridesc.ptriangles;
+	finalvert_t	*pfv = r_affinetridesc.pfinalverts;
+	int		i, j, p[3][6];
+
+	for (i = 0; i < r_affinetridesc.numtriangles; i++, ptri++)
+	{
+		finalvert_t	*v[3];
+
+		v[0] = pfv + ptri->vertindex[0];
+		v[1] = pfv + ptri->vertindex[1];
+		v[2] = pfv + ptri->vertindex[2];
+		if ((v[0]->v[1] - v[1]->v[1]) * (v[0]->v[0] - v[2]->v[0]) -
+				(v[0]->v[0] - v[1]->v[0]) * (v[0]->v[1] - v[2]->v[1]) >= 0)
+			continue;
+		for (j = 0; j < 3; j++)
+		{
+			memcpy (p[j], v[j]->v, sizeof(p[j]));
+			if (!ptri->facesfront && (v[j]->flags & ALIAS_ONSEAM))
+				p[j][2] += r_affinetridesc.seamfixupX16;
+		}
+		PE_Triangle (p[0], p[1], p[2]);
+	}
+}
+
 void D_PolysetDraw (void)
 {
 	spanpackage_t	spans[DPS_MAXSPANS + 1 +
 			((CACHE_SIZE - 1) / sizeof(spanpackage_t)) + 1];
 						// one extra because of cache line pretouching
+
+	if (pe_alias)
+	{
+		PE_PolysetDraw ();
+		return;
+	}
 
 	a_spans = (spanpackage_t *)
 			(((long)&spans[0] + CACHE_SIZE - 1) & ~(CACHE_SIZE - 1));
@@ -151,6 +186,9 @@ void D_PolysetDrawFinalVerts (finalvert_t *fv, int numverts)
 {
 	int		i, z;
 	short	*zbuf;
+
+	if (pe_alias)
+		return;
 
 	for (i=0 ; i<numverts ; i++, fv++)
 	{

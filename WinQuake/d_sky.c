@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include "d_local.h"
+#include "d_pe.h"
 
 #define SKY_SPAN_SHIFT	5
 #define SKY_SPAN_MAX	(1 << SKY_SPAN_SHIFT)
@@ -136,3 +137,44 @@ void D_DrawSkyScans8 (espan_t *pspan)
 	} while ((pspan = pspan->pnext) != NULL);
 }
 
+
+
+/*
+=================
+PE_DrawSky
+
+The engine's sky mode does D_DrawSkyScans8: the direction D_Sky_uv_To_st
+builds is linear in u and v, so it goes out as three gradients (the engine
+normalizes with the fast inverse square root).
+=================
+*/
+void PE_DrawSky (surf_t *s)
+{
+	int	i, n;
+	float	size, k;
+
+	size = (r_refdef.vrect.width >= r_refdef.vrect.height) ?
+			r_refdef.vrect.width : r_refdef.vrect.height;
+	k = 2.0f / size;
+
+	n = PE_BeginSurf (s, PE_SPAN_SKY | PE_SPAN_Z);
+	PE_Ptr (r_skysource);
+	PE_Word (256);
+	PE_Float (skytime * skyspeed);
+	PE_Float (6 * (SKYSIZE / 2 - 1));
+	PE_Word (0);
+	PE_Word (0);
+	for (i = 0; i < 3; i++)
+	{
+		float	z = (i == 2) ? 3 : 1;	/* D_Sky_uv_To_st flattens the sky */
+
+		PE_Float (z * (vpn[i] - k * ((int)vid.width >> 1) * vright[i] + k * ((int)vid.height >> 1) * vup[i]));
+		PE_Float (z * k * vright[i]);
+		PE_Float (z * -k * vup[i]);
+	}
+	PE_Float (s->d_ziorigin);
+	PE_Float (s->d_zistepu);
+	PE_Float (s->d_zistepv);
+	PE_Ptr (NULL);
+	PE_EndSurf (s, n);
+}

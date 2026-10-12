@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "d_local.h"
+#include "d_pe.h"
 
 
 /*
@@ -98,6 +99,18 @@ void D_DrawParticle (particle_t *pparticle)
 		pix = d_pix_min;
 	else if (pix > d_pix_max)
 		pix = d_pix_max;
+
+	if (pe_active && _d_y_aspect_shift == 0)
+	{
+		PE_Begin (PE_PARTICLE, 6);
+		PE_Word (u);
+		PE_Word (v);
+		PE_Word (izi);
+		PE_Word (pix);
+		PE_Word ((int)pparticle->color & 0xff);
+		PE_Word (PE_PARTICLE_OPAQUE);
+		return;
+	}
 
 	switch (pix)
 	{

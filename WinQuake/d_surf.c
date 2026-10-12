@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "d_local.h"
 #include "r_local.h"
+#include "d_pe.h"
 
 float           surfscale;
 qboolean        r_cache_thrash;         // set if surface cache is thrashing
@@ -92,6 +93,7 @@ void D_InitCaches (void *buffer, int size)
 	
 	sc_base->next = NULL;
 	sc_base->owner = NULL;
+	sc_base->pe_fence = 0;
 	sc_base->size = sc_size;
 	
 	D_ClearCacheGuard ();
@@ -110,6 +112,7 @@ void D_FlushCaches (void)
 	if (!sc_base)
 		return;
 
+	PE_Finish ();
 	for (c = sc_base ; c ; c = c->next)
 	{
 		if (c->owner)
@@ -119,6 +122,7 @@ void D_FlushCaches (void)
 	sc_rover = sc_base;
 	sc_base->next = NULL;
 	sc_base->owner = NULL;
+	sc_base->pe_fence = 0;
 	sc_base->size = sc_size;
 }
 
@@ -159,6 +163,7 @@ surfcache_t     *D_SCAlloc (int width, int size)
 	new = sc_rover;
 	if (sc_rover->owner)
 		*sc_rover->owner = NULL;
+	PE_WaitFor (new->pe_fence);
 	
 	while (new->size < size)
 	{
@@ -168,6 +173,7 @@ surfcache_t     *D_SCAlloc (int width, int size)
 			Sys_Error ("D_SCAlloc: hit the end of memory");
 		if (sc_rover->owner)
 			*sc_rover->owner = NULL;
+		PE_WaitFor (sc_rover->pe_fence);
 			
 		new->size += sc_rover->size;
 		new->next = sc_rover->next;
@@ -181,6 +187,7 @@ surfcache_t     *D_SCAlloc (int width, int size)
 		sc_rover->next = new->next;
 		sc_rover->width = 0;
 		sc_rover->owner = NULL;
+		sc_rover->pe_fence = 0;
 		new->next = sc_rover;
 		new->size = size;
 	}
@@ -284,7 +291,7 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 			&& cache->lightadj[0] == r_drawsurf.lightadj[0]
 			&& cache->lightadj[1] == r_drawsurf.lightadj[1]
 			&& cache->lightadj[2] == r_drawsurf.lightadj[2]
-			&& cache->lightadj[3] == r_drawsurf.lightadj[3] )
+			&& cache->lightadj[3] == r_drawsurf.lightadj[3] && cache->pe_valid )
 		return cache;
 
 //
@@ -327,7 +334,24 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 	r_drawsurf.surf = surface;
 
 	c_surf++;
-	R_DrawSurface ();
+	cache->pe_valid = 1;
+	if (pe_active)
+	{
+		if (pe_defer_builds)
+		{
+			/* built only if the surface's polygon draws a pixel */
+			cache->pe_valid = 0;
+			PE_Begin (PE_DEFER, 1);
+			PE_Ptr (&cache->pe_valid);
+		}
+		PE_DrawSurfaceBlocks ();
+		cache->pe_fence = pe_submitted;
+	}
+	else
+	{
+		PE_WaitFor (cache->pe_fence);
+		R_DrawSurface ();
+	}
 
 	return surface->cachespots[miplevel];
 }

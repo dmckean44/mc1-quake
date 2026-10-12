@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "d_local.h"
+#include "d_pe.h"
 
 model_t	*loadmodel;
 char	loadname[32];	// for hunk tags
@@ -279,6 +281,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 //
 // load the file
 //
+	PE_Finish ();	// loading may evict cached models the pixel engine still reads
 	buf = (unsigned *)COM_LoadStackFile (mod->name, stackbuf, sizeof(stackbuf));
 	if (!buf)
 	{

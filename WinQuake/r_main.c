@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "d_local.h"
+#include "d_pe.h"
 
 //define	PASSAGES
 
@@ -213,6 +215,7 @@ void R_Init (void)
 	Cvar_RegisterVariable (&r_aliastransbase);
 	Cvar_RegisterVariable (&r_lodsize);
 	Cvar_RegisterVariable (&r_aliastransadj);
+	PE_Init ();
 
 	Cvar_SetValue ("r_maxedges", (float)NUMSTACKEDGES);
 	Cvar_SetValue ("r_maxsurfs", (float)NUMSTACKSURFACES);
@@ -879,6 +882,7 @@ void R_EdgeDrawing (void)
 				((CACHE_SIZE - 1) / sizeof(edge_t)) + 1];
 	surf_t	lsurfs[NUMSTACKSURFACES +
 				((CACHE_SIZE - 1) / sizeof(surf_t)) + 1];
+	surf_t	*world_end;
 
 	if (auxedges)
 	{
@@ -909,6 +913,7 @@ void R_EdgeDrawing (void)
 	}
 
 	R_RenderWorld ();
+	world_end = surface_p;
 
 	if (r_drawculledpolys)
 		R_ScanEdges ();
@@ -938,7 +943,9 @@ void R_EdgeDrawing (void)
 		VID_LockBuffer ();
 	}
 	
-	if (!(r_drawpolys | r_drawculledpolys))
+	if (pe_world)
+		PE_DrawWorld (world_end);
+	else if (!(r_drawpolys | r_drawculledpolys))
 		R_ScanEdges ();
 }
 
@@ -960,6 +967,7 @@ void R_RenderView_ (void)
 		r_time1 = Sys_FloatTime ();
 
 	R_SetupFrame ();
+	PE_BeginFrame ();
 
 #ifdef PASSAGES
 SetVisibilityByPassages ();
@@ -1019,6 +1027,7 @@ SetVisibilityByPassages ();
 	if (r_dspeeds.value)
 		dp_time2 = Sys_FloatTime ();
 
+	PE_Finish ();
 	if (r_dowarp)
 		D_WarpScreen ();
 

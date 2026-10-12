@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "d_local.h"
+#include "d_pe.h"
 
 drawsurf_t	r_drawsurf;
 
@@ -330,6 +332,50 @@ void R_DrawSurface (void)
 	}
 }
 
+
+/*
+================
+PE_DrawSurfaceBlocks
+
+R_DrawSurface on the pixel engine. Its blocks interpolate the light from the
+left edge, ours from the right, so texels can differ by one light step.
+================
+*/
+void PE_DrawSurfaceBlocks (void)
+{
+	texture_t	*mt = r_drawsurf.texture;
+	int		mip = r_drawsurf.surfmip;
+	byte		*source = (byte *)mt + mt->offsets[mip];
+	int		texwidth = mt->width >> mip;
+	int		tmax = mt->height >> mip;
+	int		level = 4 - mip;
+	int		numh = r_drawsurf.surfwidth >> level;
+	int		numv = r_drawsurf.surfheight >> level;
+	int		lightwidth = (r_drawsurf.surf->extents[0] >> 4) + 1;
+	int		soffset, toffset, u, v;
+
+	R_BuildLightMap ();
+
+	soffset = ((r_drawsurf.surf->texturemins[0] >> mip) + (texwidth << 16)) % texwidth;
+	toffset = ((r_drawsurf.surf->texturemins[1] >> mip) + (tmax << 16)) % tmax;
+
+	PE_Begin (PE_SURFACE, 10 + (numh + 1) * (numv + 1));
+	PE_Ptr (source);
+	PE_Word (texwidth);
+	PE_Word (tmax);
+	PE_Word (soffset);
+	PE_Ptr (source + toffset * texwidth);
+	PE_Word (numh);
+	PE_Word (numv);
+	PE_Word (level);
+	PE_Ptr (r_drawsurf.surfdat);
+	PE_Word (r_drawsurf.rowbytes);
+	for (v = 0; v <= numv; v++)
+	{
+		for (u = 0; u <= numh; u++)
+			PE_Word (blocklights[v * lightwidth + u]);
+	}
+}
 
 //=============================================================================
 

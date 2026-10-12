@@ -22,6 +22,7 @@ set(SRCS
     d_init.c
     d_modech.c
     d_part.c
+    d_pe.c
     d_polyse.c
     d_scan.c
     d_sky.c

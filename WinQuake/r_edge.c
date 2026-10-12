@@ -21,6 +21,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "d_local.h"
+#include "d_pe.h"
+
+#if defined(MC1)
+#define SCAN_SPANS	(MAXSPANS * 4)	/* fewer flushes, so fewer waits on the engine */
+#else
+#define SCAN_SPANS	MAXSPANS
+#endif
 
 #if 0
 // FIXME
@@ -663,14 +671,16 @@ Each surface has a linked list of its visible spans
 void R_ScanEdges (void)
 {
 	int		iv, bottom;
-	byte	basespans[MAXSPANS*sizeof(espan_t)+CACHE_SIZE];
+	/* static: the pixel engine reads the spans after this returns */
+	static byte	basespans[SCAN_SPANS*sizeof(espan_t)+CACHE_SIZE];
 	espan_t	*basespan_p;
 	surf_t	*s;
 
 	basespan_p = (espan_t *)
 			((long)(basespans + CACHE_SIZE - 1) & ~(CACHE_SIZE - 1));
-	max_span_p = &basespan_p[MAXSPANS - r_refdef.vrect.width];
+	max_span_p = &basespan_p[SCAN_SPANS - r_refdef.vrect.width];
 
+	PE_WaitFor (pe_spans_fence);
 	span_p = basespan_p;
 
 // clear active edges to just the background edges around the whole screen
@@ -741,6 +751,7 @@ void R_ScanEdges (void)
 			for (s = &surfaces[1] ; s<surface_p ; s++)
 				s->spans = NULL;
 
+			PE_WaitFor (pe_spans_fence);
 			span_p = basespan_p;
 		}
 
