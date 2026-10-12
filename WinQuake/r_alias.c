@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_local.h"
 #include "d_local.h"	// FIXME: shouldn't be needed (is needed for patch
 #include "d_pe.h"
+
+static qboolean	pe_mesh;
 						// right now, but that should move)
 
 #define LIGHT_MIN	5		// lowest light value we'll allow, to avoid the
@@ -543,6 +545,10 @@ void R_AliasPrepareUnclippedPoints (void)
 
 	R_AliasTransformAndProjectFinalVerts (fv, pstverts);
 
+	if (pe_mesh && PE_DrawMesh (pfinalverts, (mtriangle_t *)((byte *)paliashdr + paliashdr->triangles),
+			pmdl->numtris, r_affinetridesc.seamfixupX16))
+		return;
+
 	if (r_affinetridesc.drawtype)
 		D_PolysetDrawFinalVerts (fv, r_anumverts);
 
@@ -756,8 +762,16 @@ void R_AliasDrawModel (alight_t *plighting)
 	acolormap = currententity->colormap;
 
 	pe_alias = pe_active && acolormap == vid.colormap;
+	pe_mesh = false;
 	if (pe_alias)
+	{
 		PE_SetSkin (r_affinetridesc.pskin, r_affinetridesc.skinwidth);
+		if (currententity->trivial_accept && pe_version >= 8)
+		{
+			pfinalverts = PE_AllocVerts (pmdl->numverts);
+			pe_mesh = true;
+		}
+	}
 	else
 		PE_Finish ();
 

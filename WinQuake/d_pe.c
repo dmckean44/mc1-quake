@@ -26,6 +26,14 @@ static cvar_t	r_pe = {"r_pe", "2"};
 static const byte	*pe_skin;
 static int	pe_skinwidth;
 
+/* model vertices the engine reads after the model is done (MESH) */
+#define PE_VERTPOOL	16384
+#define PE_MAXTRIS	4096
+static finalvert_t	pe_vertpool[PE_VERTPOOL];
+static int	pe_vertpos;
+static unsigned	pe_mesh_fence;
+static unsigned short	pe_order[PE_MAXTRIS];
+
 void PE_Init (void)
 {
 	Cvar_RegisterVariable (&r_pe);
@@ -150,6 +158,45 @@ void PE_DrawSpans (surf_t *s, int flags, const int *turb,
 	PE_Float (zstepv);
 	PE_Ptr (turb);
 	PE_EndSurf (s, n);
+}
+
+finalvert_t *PE_AllocVerts (int n)
+{
+	finalvert_t	*v;
+
+	if (pe_vertpos + n > PE_VERTPOOL)
+	{
+		PE_WaitFor (pe_mesh_fence);
+		pe_vertpos = 0;
+	}
+	v = &pe_vertpool[pe_vertpos];
+	pe_vertpos += n;
+	return v;
+}
+
+/* all the triangles of an unclipped model (version 8) */
+qboolean PE_DrawMesh (finalvert_t *verts, mtriangle_t *tris, int numtris, int seamfixup)
+{
+	int	i;
+
+	if (pe_version < 8 || numtris > PE_MAXTRIS)
+		return false;
+	if (!pe_order[1])
+	{
+		for (i = 0; i < PE_MAXTRIS; i++)
+			pe_order[i] = i;
+	}
+	pe_mesh_fence = PE_Begin (PE_MESH, 9);
+	PE_Ptr (verts);
+	PE_Word (sizeof(finalvert_t));
+	PE_Ptr (tris);
+	PE_Ptr (pe_order);
+	PE_Word (numtris);
+	PE_Ptr (NULL);
+	PE_Word (PE_MESH_QUAKE);
+	PE_Word (0);		/* unclipped, the flags only mark the seam */
+	PE_Word (seamfixup);
+	return true;
 }
 
 void PE_Triangle (const int *p0, const int *p1, const int *p2)

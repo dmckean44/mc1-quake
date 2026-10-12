@@ -26,9 +26,11 @@ enum {
 	PE_PARTICLE = 4,
 	PE_TARGET = 5,
 	PE_SKIN = 6,
+	PE_MESH = 12,
 	PE_COVER = 7,
 	PE_POLY = 8,
 	PE_FILL = 9,
+	PE_LITSURF = 10,
 	PE_DEFER = 11
 };
 
@@ -39,6 +41,11 @@ enum {
 	PE_SPAN_FLAT = 8,
 	PE_SPAN_SKY = 16
 };
+
+#define PE_MESH_QUAKE	1
+
+/* LITSURF (version 8): one-byte light samples */
+#define PE_LITSURF_MONO		0x100
 
 enum {
 	PE_PARTICLE_OPAQUE = 0,
@@ -124,6 +131,9 @@ static inline void PE_Finish (void)
 void PE_Init (void);
 void PE_BeginFrame (void);
 void PE_SetSkin (const byte *skin, int skinwidth);
+finalvert_t *PE_AllocVerts (int n);
+qboolean PE_DrawMesh (finalvert_t *verts, mtriangle_t *tris, int numtris, int seamfixup);
+qboolean PE_LitSurfaceFits (void);
 void PE_DrawSpans (surf_t *s, int flags, const int *turb,
 		float zorigin, float zstepu, float zstepv);
 void PE_DrawWorld (surf_t *world_end);
