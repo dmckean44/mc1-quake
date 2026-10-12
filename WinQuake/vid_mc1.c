@@ -31,9 +31,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 
 // Video resolution (hardcoded).
+#ifndef BASEWIDTH
 #define BASEWIDTH 320
+#endif
 #ifndef BASEHEIGHT
-#define BASEHEIGHT ((BASEWIDTH * 9 + 8) / 16)
+#define BASEHEIGHT 240
 #endif
 
 // Memory config.
@@ -242,7 +244,11 @@ void VID_Init (unsigned char *palette)
 	// Set up the vid structure that is used by the Quake rendering engine.
 	vid.maxwarpwidth = vid.width = vid.conwidth = BASEWIDTH;
 	vid.maxwarpheight = vid.height = vid.conheight = BASEHEIGHT;
+#if BASEWIDTH * 3 == BASEHEIGHT * 8
+	vid.aspect = 0.5;	/* 640x240 on a 4:3 screen: pixels twice as tall as wide */
+#else
 	vid.aspect = 1.0;
+#endif
 	vid.numpages = s_numpages;
 	vid.colormap = host_colormap;
 	vid.fullbright = 256 - LittleLong (*((int *)vid.colormap + 2048));
