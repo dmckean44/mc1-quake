@@ -112,20 +112,66 @@ void R_MarkLights (dlight_t *light, int bit, mnode_t *node)
 R_PushDlights
 =============
 */
+static qboolean	r_dlightspending;
+
 void R_PushDlights (void)
+{
+	r_dlightframecount = r_framecount + 1;	// because the count hasn't
+						//  advanced yet for this frame
+	r_dlightspending = true;	/* marked by R_MarkDlightsVis once the leaves are */
+}
+
+/* R_MarkLights for the world, skipping nodes that are not visible this frame */
+static void R_MarkLightsVis (dlight_t *light, int bit, mnode_t *node)
+{
+	mplane_t	*splitplane;
+	float		dist;
+	msurface_t	*surf;
+	int			i;
+
+	while (node->contents >= 0 && node->visframe == r_visframecount)
+	{
+		splitplane = node->plane;
+		dist = DotProduct (light->origin, splitplane->normal) - splitplane->dist;
+		if (dist > fabsf (light->radius))
+		{
+			node = node->children[0];
+			continue;
+		}
+		if (dist < -fabsf (light->radius))
+		{
+			node = node->children[1];
+			continue;
+		}
+		surf = cl.worldmodel->surfaces + node->firstsurface;
+		for (i = 0; i < node->numsurfaces; i++, surf++)
+		{
+			if (surf->dlightframe != r_dlightframecount)
+			{
+				surf->dlightbits = 0;
+				surf->dlightframe = r_dlightframecount;
+			}
+			surf->dlightbits |= bit;
+		}
+		R_MarkLightsVis (light, bit, node->children[0]);
+		node = node->children[1];
+	}
+}
+
+void R_MarkDlightsVis (void)
 {
 	int		i;
 	dlight_t	*l;
 
-	r_dlightframecount = r_framecount + 1;	// because the count hasn't
-											//  advanced yet for this frame
+	if (!r_dlightspending)
+		return;
+	r_dlightspending = false;
 	l = cl_dlights;
-
-	for (i=0 ; i<MAX_DLIGHTS ; i++, l++)
+	for (i = 0; i < MAX_DLIGHTS; i++, l++)
 	{
 		if (l->die < cl.time || !l->radius)
 			continue;
-		R_MarkLights ( l, 1<<i, cl.worldmodel->nodes );
+		R_MarkLightsVis (l, 1<<i, cl.worldmodel->nodes);
 	}
 }
 
