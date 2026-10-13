@@ -27,11 +27,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /* With engine version 13 the particles of a frame go out as one batch
    (PARTICLES): x, y, z and colour per particle, transformed by the engine.
    Two buffers, each reused once the engine is done with it. */
-#define PE_MAXPART	2048
 static float		pe_part[2][PE_MAXPART][4];
 static unsigned		pe_part_fence[2];
-static int		pe_part_buf, pe_numpart;
-static qboolean		pe_part_batch;
+static int		pe_part_buf;
+int			pe_numpart;
+qboolean		pe_part_batch;
+float			(*pe_partrec)[4];	/* the buffer being filled (R_DrawParticles) */
 
 /*
 ==============
@@ -83,6 +84,7 @@ void D_StartParticles (void)
 	{
 		PE_WaitFor (pe_part_fence[pe_part_buf]);
 		pe_numpart = 0;
+		pe_partrec = pe_part[pe_part_buf];
 	}
 }
 

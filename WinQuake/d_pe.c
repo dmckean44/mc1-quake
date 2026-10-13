@@ -16,6 +16,7 @@ qboolean	pe_face;
 qboolean	pe_faceclip;
 qboolean	pe_guard_models;
 qboolean	pe_sprites;
+qboolean	pe_blit2d;
 int		pe_version;
 pe_surfedge_t	*pe_surfedges;
 int		pe_numsurfedges;
@@ -95,6 +96,7 @@ void PE_BeginFrame (void)
 	/* the engine clips to the screen: models that only leave it are drawn unclipped */
 	pe_guard_models = pe_world && r_peguard.value;
 	pe_sprites = pe_active && pe_version >= 11 && r_pesprite.value;
+	pe_blit2d = pe_active && pe_version >= 14;
 	if (!pe_active)
 		return;
 
@@ -289,4 +291,27 @@ void PE_Triangle (const int *p0, const int *p1, const int *p2)
 		PE_Word (p1[i]);
 	for (i = 0; i < 6; i++)
 		PE_Word (p2[i]);
+}
+
+/* a 2D image at (x, y) of the frame buffer, sstep and tstep in 16.16 source texels */
+void PE_Blit (const byte *src, int srcwidth, int sstep, int tstep, int x, int y, int w, int h,
+		int flags, const byte *remap)
+{
+	int	i;
+
+	PE_Begin (PE_BLIT, remap ? 12 + 64 : 12);
+	PE_Ptr (src);
+	PE_Word (srcwidth);
+	PE_Word (sstep);
+	PE_Word (tstep);
+	PE_Word (0);
+	PE_Word (0);
+	PE_Ptr (vid.buffer + y * vid.rowbytes + x);
+	PE_Word (vid.rowbytes);
+	PE_Word (w);
+	PE_Word (h);
+	PE_Word (flags | (remap ? 4 : 0));
+	PE_Word (0);
+	for (i = 0; remap && i < 256; i += 4)
+		PE_Word (remap[i] | (remap[i + 1] << 8) | (remap[i + 2] << 16) | ((unsigned)remap[i + 3] << 24));
 }

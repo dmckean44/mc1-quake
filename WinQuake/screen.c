@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "d_pe.h"
 
 // only the refresh window will be updated unless these variables are flagged 
 int			scr_copytop;
@@ -683,6 +684,7 @@ void SCR_ScreenShot_f (void)
 	D_EnableBackBufferAccess ();	// enable direct drawing of console to back
 									//  buffer
 
+	PE_Finish ();
 	WritePCXfile (pcxname, vid.buffer, vid.width, vid.height, vid.rowbytes,
 				  host_basepal);
 

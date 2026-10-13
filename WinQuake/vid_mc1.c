@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "d_local.h"
+#include "r_local.h"
+#include "d_pe.h"
 #include "mc1.h"
 
 #include <string.h>
@@ -293,6 +295,7 @@ void VID_Update (vrect_t *rects)
 {
 	vrect_t *rect;
 
+	PE_Finish ();	/* the engine may still be drawing this frame */
 	VID_DumpFrame ();
 
 	if (s_numpages == 2)

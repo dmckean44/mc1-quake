@@ -106,6 +106,7 @@ if(MC1)
        net_none.c
        snd_null.c
        sys_mc1.c
+       fastmath_mc1.c
        vid_mc1.c
        d_scan_mr32.s
        r_surf_mr32.s

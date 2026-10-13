@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "d_pe.h"
 
 /* Explosions want thousands of random numbers in one frame: a xorshift with
    the C library's range (0..RAND_MAX = 2^31 - 1) is much cheaper than rand. */
@@ -56,9 +57,19 @@ vec3_t			r_pright, r_pup, r_ppn;
 R_InitParticles
 ===============
 */
+/* particles per explosion (1024 in Quake; MC1 defaults to half, the update
+   loop of a few thousand particles costs more than a frame can spare) */
+#ifdef MC1
+cvar_t	r_explosionparticles = {"r_explosionparticles", "512"};
+#else
+cvar_t	r_explosionparticles = {"r_explosionparticles", "1024"};
+#endif
+
 void R_InitParticles (void)
 {
 	int		i;
+
+	Cvar_RegisterVariable (&r_explosionparticles);
 
 	i = COM_CheckParm ("-particles");
 
@@ -293,11 +304,15 @@ R_ParticleExplosion
 */
 void R_ParticleExplosion (vec3_t org)
 {
-	int			i, j;
+	int			i;
 	particle_t	*p;
-	
-	for (i=0 ; i<1024 ; i++)
+	const float	die = cl.time + 5;	/* cl.time is a double: add once */
+	const int	count = r_explosionparticles.value < 1024 ? (int)r_explosionparticles.value : 1024;
+
+	for (i=0 ; i<count ; i++)
 	{
+		unsigned int	r1, r2;
+
 		if (!free_particles)
 			return;
 		p = free_particles;
@@ -305,27 +320,20 @@ void R_ParticleExplosion (vec3_t org)
 		p->next = active_particles;
 		active_particles = p;
 
-		p->die = cl.time + 5;
+		/* two random words per particle, cut into the fields Quake asks for:
+		   ramp 0..3, origin offsets -16..15 and velocities -256..255 */
+		r1 = (unsigned int)rand ();
+		r2 = (unsigned int)rand ();
+		p->die = die;
 		p->color = ramp1[0];
-		p->ramp = rand()&3;
-		if (i & 1)
-		{
-			p->type = pt_explode;
-			for (j=0 ; j<3 ; j++)
-			{
-				p->org[j] = org[j] + ((rand()%32)-16);
-				p->vel[j] = (rand()%512)-256;
-			}
-		}
-		else
-		{
-			p->type = pt_explode2;
-			for (j=0 ; j<3 ; j++)
-			{
-				p->org[j] = org[j] + ((rand()%32)-16);
-				p->vel[j] = (rand()%512)-256;
-			}
-		}
+		p->ramp = r1 & 3;
+		p->type = (i & 1) ? pt_explode : pt_explode2;
+		p->org[0] = org[0] + (float)((int)((r1 >> 2) & 31) - 16);
+		p->org[1] = org[1] + (float)((int)((r1 >> 7) & 31) - 16);
+		p->org[2] = org[2] + (float)((int)((r1 >> 12) & 31) - 16);
+		p->vel[0] = (float)((int)((r1 >> 17) & 511) - 256);
+		p->vel[1] = (float)((int)(r2 & 511) - 256);
+		p->vel[2] = (float)((int)((r2 >> 9) & 511) - 256);
 	}
 }
 
@@ -680,6 +688,7 @@ void R_DrawParticles (void)
 	float			time1;
 	float			dvel;
 	float			frametime;
+	float			time;
 
 #ifdef GLQUAKE
 	vec3_t			up, right;
@@ -700,6 +709,7 @@ void R_DrawParticles (void)
 	VectorCopy (vpn, r_ppn);
 #endif
 	frametime = cl.time - cl.oldtime;
+	time = cl.time;	/* cl.time is a double: compare the particles with a float */
 	time3 = frametime * 15;
 	time2 = frametime * 10; // 15;
 	time1 = frametime * 5;
@@ -709,7 +719,7 @@ void R_DrawParticles (void)
 	for ( ;; ) 
 	{
 		kill = active_particles;
-		if (kill && kill->die < cl.time)
+		if (kill && kill->die < time)
 		{
 			active_particles = kill->next;
 			kill->next = free_particles;
@@ -724,7 +734,7 @@ void R_DrawParticles (void)
 		for ( ;; )
 		{
 			kill = p->next;
-			if (kill && kill->die < cl.time)
+			if (kill && kill->die < time)
 			{
 				p->next = kill->next;
 				kill->next = free_particles;
@@ -750,7 +760,21 @@ void R_DrawParticles (void)
 		glTexCoord2f (0,1);
 		glVertex3f (p->org[0] + right[0]*scale, p->org[1] + right[1]*scale, p->org[2] + right[2]*scale);
 #else
-		D_DrawParticle (p);
+		if (pe_part_batch)
+		{
+			/* the engine transforms and draws the batch: just copy the particle */
+			if (pe_numpart < PE_MAXPART)
+			{
+				float	*rec = pe_partrec[pe_numpart++];
+
+				rec[0] = p->org[0];
+				rec[1] = p->org[1];
+				rec[2] = p->org[2];
+				((int *)rec)[3] = (int)p->color & 0xff;
+			}
+		}
+		else
+			D_DrawParticle (p);
 #endif
 		p->org[0] += p->vel[0]*frametime;
 		p->org[1] += p->vel[1]*frametime;

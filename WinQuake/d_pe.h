@@ -27,6 +27,7 @@ enum {
 	PE_TARGET = 5,
 	PE_SKIN = 6,
 	PE_MESH = 12,
+	PE_BLIT = 16,
 	PE_SPRITE = 13,
 	PE_VERTS = 14,
 	PE_COVER = 7,
@@ -74,7 +75,18 @@ extern unsigned pe_spans_fence;
 extern qboolean pe_world;
 extern qboolean pe_face;	/* world faces go out whole, as FACE (version 10) */
 extern qboolean pe_faceclip;	/* FACE mip levels from the face clipped to the screen */
-extern qboolean pe_sprites;	/* sprites as SPRITE commands (version 11) */
+extern qboolean pe_sprites;
+/* 2D images as BLIT commands (version 14); CPU 2D drawing calls PE_Finish first */
+extern qboolean pe_blit2d;
+#define PE_BLIT_KEY(c)	(8 | ((c) << 8))	/* transparent texel c */
+#define PE_BLIT_OPAQUE	16
+void PE_Blit (const byte *src, int srcwidth, int sstep, int tstep, int x, int y, int w, int h,
+		int flags, const byte *remap);
+/* the particle batch (version 13): records x, y, z, colour */
+#define PE_MAXPART	2048
+extern qboolean pe_part_batch;
+extern int pe_numpart;
+extern float (*pe_partrec)[4];	/* sprites as SPRITE commands (version 11) */
 extern qboolean pe_guard_models;
 extern qboolean pe_defer_builds;
 extern int pe_version;

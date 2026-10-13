@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "d_pe.h"
 
 
 /*
@@ -119,6 +120,7 @@ void R_LineGraph (int x, int y, int h)
 	x += r_refdef.vrect.x;
 	y += r_refdef.vrect.y;
 	
+	PE_Finish ();
 	dest = vid.buffer + vid.rowbytes*y + x;
 	
 	s = r_graphheight.value;

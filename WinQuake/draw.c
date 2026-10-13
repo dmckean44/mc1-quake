@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // vid buffer
 
 #include "quakedef.h"
+#include "r_local.h"
+#include "d_pe.h"
 
 typedef struct {
 	vrect_t	rect;
@@ -165,6 +167,12 @@ void Draw_Character (int x, int y, int num)
 	else
 		drawline = 8;
 
+	if (pe_blit2d && r_pixbytes == 1 && vid.conbuffer == vid.buffer)
+	{
+		PE_Blit (source, 128, 0x10000, 0x10000, x, y, 8, drawline, PE_BLIT_KEY(0), NULL);
+		return;
+	}
+
 
 	if (r_pixbytes == 1)
 	{
@@ -255,6 +263,7 @@ void Draw_DebugChar (char num)
 	extern byte		*draw_chars;
 	int				row, col;
 
+	PE_Finish ();	/* the CPU draws into the frame buffer */
 	if (!vid.direct)
 		return;		// don't have direct FB access, so no debugchars...
 
@@ -324,6 +333,12 @@ void Draw_Pic (int x, int y, qpic_t *pic)
 	else
 	{
 		dv = 0x10000;
+	}
+
+	if (pe_blit2d)
+	{
+		PE_Blit (pic->data, pic->width, du, dv, x, y, w, h, PE_BLIT_OPAQUE, NULL);
+		return;
 	}
 
 	if (r_pixbytes == 1)
@@ -422,6 +437,12 @@ void Draw_TransPic (int x, int y, qpic_t *pic)
 	else
 	{
 		dv = 0x10000;
+	}
+
+	if (pe_blit2d)
+	{
+		PE_Blit (pic->data, pic->width, du, dv, x, y, w, h, PE_BLIT_KEY(TRANSPARENT_COLOR), NULL);
+		return;
 	}
 
 	if (r_pixbytes == 1)
@@ -528,6 +549,13 @@ void Draw_TransPicTranslate (int x, int y, qpic_t *pic, byte *translation)
 		Sys_Error ("Draw_TransPic: bad coordinates");
 	}
 		
+	if (pe_blit2d)
+	{
+		PE_Blit (pic->data, pic->width, 0x10000, 0x10000, x, y, pic->width, pic->height,
+				PE_BLIT_KEY(TRANSPARENT_COLOR), translation);
+		return;
+	}
+
 	source = pic->data;
 
 	if (r_pixbytes == 1)
@@ -637,6 +665,7 @@ void Draw_ConsoleBackground (int lines)
 	qpic_t			*conback;
 	char			ver[100];
 
+	PE_Finish ();	/* the CPU draws into the frame buffer */
 	conback = Draw_CachePic ("gfx/conback.lmp");
 
 // hack the version number directly into the pic
@@ -835,6 +864,7 @@ void Draw_TileClear (int x, int y, int w, int h)
 	byte			*psrc;
 	vrect_t			vr;
 
+	PE_Finish ();	/* the CPU draws into the frame buffer */
 	r_rectdesc.rect.x = x;
 	r_rectdesc.rect.y = y;
 	r_rectdesc.rect.width = w;
@@ -908,6 +938,7 @@ void Draw_Fill (int x, int y, int w, int h, int c)
 	unsigned		uc;
 	int				u, v;
 
+	PE_Finish ();	/* the CPU draws into the frame buffer */
 	if (r_pixbytes == 1)
 	{
 		dest = vid.buffer + y*vid.rowbytes + x;
@@ -938,6 +969,7 @@ void Draw_FadeScreen (void)
 	int			x,y;
 	byte		*pbuf;
 
+	PE_Finish ();	/* the CPU draws into the frame buffer */
 	VID_UnlockBuffer ();
 	S_ExtraUpdate ();
 	VID_LockBuffer ();
@@ -973,6 +1005,7 @@ Call before beginning any disc IO.
 */
 void Draw_BeginDisc (void)
 {
+	PE_Finish ();	/* the CPU draws into the frame buffer */
 	if (draw_disc != NULL)
 		D_BeginDirectRect (vid.width - 24, 0, draw_disc->data, 24, 24);
 }
@@ -988,7 +1021,7 @@ Call after completing any disc IO
 */
 void Draw_EndDisc (void)
 {
-
+	PE_Finish ();
 	D_EndDirectRect (vid.width - 24, 0, 24, 24);
 }
 
