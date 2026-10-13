@@ -24,6 +24,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "d_pe.h"
 
 
+/* With engine version 13 the particles of a frame go out as one batch
+   (PARTICLES): x, y, z and colour per particle, transformed by the engine.
+   Two buffers, each reused once the engine is done with it. */
+#define PE_MAXPART	2048
+static float		pe_part[2][PE_MAXPART][4];
+static unsigned		pe_part_fence[2];
+static int		pe_part_buf, pe_numpart;
+static qboolean		pe_part_batch;
+
 /*
 ==============
 D_EndParticles
@@ -31,9 +40,36 @@ D_EndParticles
 */
 void D_EndParticles (void)
 {
-// not used by software driver
-}
+	int	i;
 
+	if (!pe_part_batch)
+		return;
+	pe_part_batch = false;
+	if (!pe_numpart)
+		return;
+	pe_part_fence[pe_part_buf] = PE_Begin (PE_PARTICLES, 24);
+	PE_Ptr (pe_part[pe_part_buf]);
+	PE_Word (pe_numpart);
+	for (i = 0; i < 3; i++)
+		PE_Float (r_origin[i]);
+	for (i = 0; i < 3; i++)
+		PE_Float (r_pright[i]);
+	for (i = 0; i < 3; i++)
+		PE_Float (r_pup[i]);
+	for (i = 0; i < 3; i++)
+		PE_Float (r_ppn[i]);
+	PE_Float (xcenter);
+	PE_Float (ycenter);
+	PE_Word (d_vrectx);
+	PE_Word (d_vrecty);
+	PE_Word (d_vrectright_particle);
+	PE_Word (d_vrectbottom_particle);
+	PE_Word (d_pix_shift);
+	PE_Word (d_pix_min);
+	PE_Word (d_pix_max);
+	PE_Float (PARTICLE_Z_CLIP);
+	pe_part_buf ^= 1;
+}
 
 /*
 ==============
@@ -42,9 +78,13 @@ D_StartParticles
 */
 void D_StartParticles (void)
 {
-// not used by software driver
+	pe_part_batch = pe_active && pe_version >= 13 && d_y_aspect_shift == 0;
+	if (pe_part_batch)
+	{
+		PE_WaitFor (pe_part_fence[pe_part_buf]);
+		pe_numpart = 0;
+	}
 }
-
 
 #if	!id386
 
@@ -64,6 +104,20 @@ void D_DrawParticle (particle_t *pparticle)
 	int		_screenwidth = screenwidth;
 	unsigned int	_d_zwidth = d_zwidth;
 	int		_d_y_aspect_shift = d_y_aspect_shift;
+
+	if (pe_part_batch)
+	{
+		if (pe_numpart < PE_MAXPART)
+		{
+			float	*rec = pe_part[pe_part_buf][pe_numpart++];
+
+			rec[0] = pparticle->org[0];
+			rec[1] = pparticle->org[1];
+			rec[2] = pparticle->org[2];
+			((int *)rec)[3] = (int)pparticle->color & 0xff;	/* opaque */
+		}
+		return;
+	}
 
 // transform point
 	VectorSubtract (pparticle->org, r_origin, local);

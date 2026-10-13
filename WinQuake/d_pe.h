@@ -35,7 +35,8 @@ enum {
 	PE_LITSURF = 10,
 	PE_DEFER = 11,
 	PE_VIEW = 17,
-	PE_FACE = 18
+	PE_FACE = 18,
+	PE_PARTICLES = 19
 };
 
 enum {
