@@ -67,6 +67,29 @@ static void Prof_Frames (void)
 #define Prof_Frames()		do {} while (0)
 #endif
 
+/* prof_frames N: in a game (not a demo), after 60 frames to settle, the cycles of
+   the next N host frames (PROF_START, TDFRAMES, PROF_END), then quit */
+cvar_t	prof_frames = {"prof_frames", "0"};
+
+void CL_ProfGameFrame (void)
+{
+	static int	count;
+
+	if (prof_frames.value <= 0 || cls.demoplayback || cls.signon != SIGNONS)
+		return;
+	if (count == 60)
+		Prof_Mark ("PROF_START");
+	if (count >= 60)
+		Prof_Frame (count == 60);
+	if (count == 60 + (int)prof_frames.value)
+	{
+		Prof_Mark ("PROF_END");
+		Prof_Frames ();
+		Sys_Quit ();
+	}
+	count++;
+}
+
 void CL_FinishTimeDemo (void);
 
 /*

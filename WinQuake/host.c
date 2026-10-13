@@ -212,6 +212,7 @@ void Host_InitLocal (void)
 	
 	Cvar_RegisterVariable (&host_framerate);
 	Cvar_RegisterVariable (&host_speeds);
+	Cvar_RegisterVariable (&prof_frames);
 
 	Cvar_RegisterVariable (&sys_ticrate);
 	Cvar_RegisterVariable (&serverprofile);
@@ -729,6 +730,7 @@ static void _Host_Frame (float time)
 					pass1+pass2+pass3, pass1, pass2, pass3);
 	}
 	
+	CL_ProfGameFrame ();
 	host_framecount++;
 }
 

@@ -303,6 +303,8 @@ void CL_Signon4 (void);
 void CL_Disconnect (void);
 void CL_Disconnect_f (void);
 void CL_NextDemo (void);
+void CL_ProfGameFrame (void);
+extern cvar_t prof_frames;
 
 #define			MAX_VISEDICTS	256
 extern	int				cl_numvisedicts;
