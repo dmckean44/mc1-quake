@@ -21,6 +21,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 
+/* Explosions want thousands of random numbers in one frame: a xorshift with
+   the C library's range (0..RAND_MAX = 2^31 - 1) is much cheaper than rand. */
+static unsigned int	r_partseed = 0x2545f491;
+
+static inline int R_PartRand (void)
+{
+	r_partseed ^= r_partseed << 13;
+	r_partseed ^= r_partseed >> 17;
+	r_partseed ^= r_partseed << 5;
+	return (int)(r_partseed >> 1);
+}
+#define rand()	R_PartRand ()
+
 #define MAX_PARTICLES			2048	// default max # of particles at one
 										//  time
 #define ABSOLUTE_MIN_PARTICLES	512		// no fewer than this no matter what's
