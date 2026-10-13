@@ -44,7 +44,8 @@ enum {
 	PE_SPAN_Z = 2,
 	PE_SPAN_TURB = 4,
 	PE_SPAN_FLAT = 8,
-	PE_SPAN_SKY = 16
+	PE_SPAN_SKY = 16,
+	PE_SPAN_NOCOVER = 64	/* depth-tested, not front to back (version 9) */
 };
 
 #define PE_MESH_QUAKE	1
@@ -139,6 +140,7 @@ static inline void PE_Finish (void)
 
 void PE_Init (void);
 void PE_BeginFrame (void);
+void R_BmodelViewOrigin (const entity_t *e, vec3_t org);
 void PE_SetSkin (const byte *skin, int skinwidth);
 finalvert_t *PE_AllocVerts (int n);
 qboolean PE_DrawMesh (finalvert_t *verts, mtriangle_t *tris, int numtris, int seamfixup);

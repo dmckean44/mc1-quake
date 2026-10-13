@@ -492,7 +492,7 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 		return;
 	}
 
-	if (pe_face && !insubmodel)
+	if (pe_face)
 	{
 		/* The engine clips and projects the whole face (FACE). The mip level wants
 		   the nearest 1/z, no nearer than z = 1: the nearest vertex. With
