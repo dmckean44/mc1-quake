@@ -506,7 +506,7 @@ qboolean Host_FilterTime (float time)
 	realtime += (double)time;
 
 	_new_host_frametime = (float)(realtime - oldrealtime);
-	if (!cls.timedemo && _new_host_frametime < (1.0F/72.0F))
+	if (!cls.timedemo && prof_frames.value <= 0 && _new_host_frametime < (1.0F/72.0F))
 		return false;		// framerate is too high
 
 	oldrealtime = realtime;

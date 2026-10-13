@@ -147,6 +147,58 @@ void PE_SetSkin (const byte *skin, int skinwidth)
 
 /* A surface command's first two words: its spans, or in stage B its screen
    edges as a polygon (sent by PE_EndSurf after the other 19 words). */
+/* the first 7 words of FACE and FACETEX: a whole face, which the engine clips
+   and projects. Brush models come last, depth-tested, each with its own camera. */
+static void PE_FaceHeader (const surf_t *s, int flags, unsigned op, unsigned words)
+{
+	const msurface_t *fa = (const msurface_t *) s->data;
+	const model_t	*mod = cl.worldmodel;
+
+	if (s->insubmodel)
+	{
+		mod = s->entity->model;
+		if (s->entity != pe_view_entity)
+		{
+			vec3_t	org;
+
+			R_BmodelViewOrigin (s->entity, org);
+			PE_SendView (org);
+			pe_view_entity = s->entity;
+		}
+		flags |= PE_SPAN_NOCOVER;
+	}
+	PE_Begin (op, words);
+	PE_Word (flags);
+	PE_Ptr (mod->vertexes);
+	PE_Ptr (mod->surfedges);
+	PE_Ptr (mod->edges);
+	PE_Word (sizeof(medge_t));
+	PE_Word (fa->firstedge);
+	PE_Word (fa->numedges);
+}
+
+/* a solid face whose texture gradients the engine works out (FACETEX, version 15):
+   R_RenderFace skipped the 1/z gradients and D_CalcGradients is not needed */
+extern vec3_t	transformed_modelorg;
+
+void PE_DrawFaceTex (surf_t *s, int flags, int mip)
+{
+	const msurface_t *fa = (const msurface_t *) s->data;
+
+	PE_FaceHeader (s, flags, PE_FACETEX, 18);
+	PE_Ptr (cacheblock);
+	PE_Word (cachewidth);
+	PE_Word (mip);
+	PE_Ptr (fa->texinfo->vecs);
+	PE_Ptr (fa->plane);
+	PE_Word ((fa->texturemins[0] & 0xffff) | (fa->texturemins[1] << 16));
+	PE_Word ((fa->extents[0] & 0xffff) | (fa->extents[1] << 16));
+	PE_Float (transformed_modelorg[0]);
+	PE_Float (transformed_modelorg[1]);
+	PE_Float (transformed_modelorg[2]);
+	PE_Ptr (NULL);
+}
+
 int PE_BeginSurf (surf_t *s, int flags)
 {
 	if (!pe_world)
@@ -165,32 +217,7 @@ int PE_BeginSurf (surf_t *s, int flags)
 	}
 	if (s->pe_count < 0)
 	{
-		/* a whole face: the engine clips and projects it (FACE). Brush
-		   models come last, depth-tested, each with its own camera. */
-		const msurface_t *fa = (const msurface_t *) s->data;
-		const model_t	*mod = cl.worldmodel;
-
-		if (s->insubmodel)
-		{
-			mod = s->entity->model;
-			if (s->entity != pe_view_entity)
-			{
-				vec3_t	org;
-
-				R_BmodelViewOrigin (s->entity, org);
-				PE_SendView (org);
-				pe_view_entity = s->entity;
-			}
-			flags |= PE_SPAN_NOCOVER;
-		}
-		PE_Begin (PE_FACE, 26);
-		PE_Word (flags);
-		PE_Ptr (mod->vertexes);
-		PE_Ptr (mod->surfedges);
-		PE_Ptr (mod->edges);
-		PE_Word (sizeof(medge_t));
-		PE_Word (fa->firstedge);
-		PE_Word (fa->numedges);
+		PE_FaceHeader (s, flags, PE_FACE, 26);
 		return 0;
 	}
 	PE_Begin (PE_POLY, 21 + 3 * s->pe_count);

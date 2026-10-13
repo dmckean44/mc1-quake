@@ -726,6 +726,12 @@ post:
 	surface_p->key = r_currentkey++;
 	surface_p->spans = NULL;
 
+	if (surface_p->pe_count < 0 && PE_FACETEX_OK(fa->flags))
+	{
+		surface_p++;	/* the engine works out the gradients (FACETEX) */
+		return;
+	}
+
 	pplane = fa->plane;
 // FIXME: cache this?
 	TransformVector (pplane->normal, p_normal);

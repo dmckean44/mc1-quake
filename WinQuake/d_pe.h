@@ -37,7 +37,8 @@ enum {
 	PE_DEFER = 11,
 	PE_VIEW = 17,
 	PE_FACE = 18,
-	PE_PARTICLES = 19
+	PE_PARTICLES = 19,
+	PE_FACETEX = 20
 };
 
 enum {
@@ -161,6 +162,10 @@ void PE_DrawSpans (surf_t *s, int flags, const int *turb,
 		float zorigin, float zstepu, float zstepv);
 void PE_DrawWorld (surf_t *world_end);
 int PE_BeginSurf (surf_t *s, int flags);
+void PE_DrawFaceTex (surf_t *s, int flags, int mip);
+/* solid faces go out as FACETEX: the engine computes their gradients (version 15) */
+#define PE_FACETEX_OK(flags)	(pe_face && pe_version >= 15 && \
+		!((flags) & (SURF_DRAWSKY | SURF_DRAWBACKGROUND | SURF_DRAWTURB)))
 void PE_EndSurf (surf_t *s, int n);
 void PE_DrawSky (surf_t *s);
 void PE_DrawSurfaceBlocks (void);

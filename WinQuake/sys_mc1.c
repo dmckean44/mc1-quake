@@ -298,8 +298,9 @@ void Sys_Quit (void)
 
 double Sys_FloatTime (void)
 {
-#if 1
-	// MRISC32 simulator timing: Use gettimeofday().
+#if 0
+	// MRISC32 simulator timing: Use gettimeofday() (wall-clock time of the host,
+	// so simulator runs are not repeatable).
 	static qboolean s_first = true;
 	static struct timeval s_t0;
 	struct timeval t;

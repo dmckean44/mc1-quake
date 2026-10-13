@@ -291,6 +291,15 @@ static void D_DrawSurface (surf_t *s)
 		cacheblock = (pixel_t *)pcurrentcache->data;
 		cachewidth = pcurrentcache->width;
 
+		if (pe_active && s->pe_count < 0 && PE_FACETEX_OK(s->flags))
+		{
+			PE_DrawFaceTex (s, PE_SPAN_TEX | PE_SPAN_Z, miplevel);
+			pcurrentcache->pe_fence = pe_submitted;
+			if (s->insubmodel)
+				D_LeaveBmodel ();
+			return;
+		}
+
 		D_CalcGradients (pface);
 
 		if (pe_active)
