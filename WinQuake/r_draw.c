@@ -408,6 +408,61 @@ void R_EmitCachedEdge (void)
 }
 
 
+/* nearest z of a face clipped to the screen planes in mask */
+static float R_FaceClipZ (const model_t *model, const msurface_t *fa, unsigned mask)
+{
+	vec3_t	pts[2][64];
+	int	i, n = 0, p = 0;
+	float	zmin = 1e30f;
+
+	for (i = 0; i < fa->numedges && i < 64; i++, n++)
+	{
+		const int lindex = model->surfedges[fa->firstedge + i];
+		const medge_t *e = &model->edges[lindex > 0 ? lindex : -lindex];
+
+		VectorCopy (r_pcurrentvertbase[lindex > 0 ? e->v[0] : e->v[1]].position, pts[0][n]);
+	}
+	for (unsigned k = 0; k < 4 && n >= 3; k++)
+	{
+		const clipplane_t *cp = &view_clipplanes[k];
+		int	m = 0;
+
+		if (!(mask & (1u << k)))
+			continue;
+		for (i = 0; i < n && m < 62; i++)
+		{
+			const float *a = pts[p][i], *b = pts[p][i + 1 < n ? i + 1 : 0];
+			const float da = DotProduct(a, cp->normal) - cp->dist;
+			const float db = DotProduct(b, cp->normal) - cp->dist;
+
+			if (da >= 0)
+			{
+				VectorCopy (a, pts[p ^ 1][m]);
+				m++;
+			}
+			if ((da >= 0) != (db >= 0))
+			{
+				const float f = da / (da - db);
+				pts[p ^ 1][m][0] = a[0] + f * (b[0] - a[0]);
+				pts[p ^ 1][m][1] = a[1] + f * (b[1] - a[1]);
+				pts[p ^ 1][m][2] = a[2] + f * (b[2] - a[2]);
+				m++;
+			}
+		}
+		p ^= 1;
+		n = m;
+	}
+	for (i = 0; n >= 3 && i < n; i++)
+	{
+		const float z = (pts[p][i][0] - modelorg[0]) * vpn[0] + (pts[p][i][1] - modelorg[1]) * vpn[1] +
+			(pts[p][i][2] - modelorg[2]) * vpn[2];
+
+		if (z < zmin)
+			zmin = z;
+	}
+	return zmin;
+}
+
 /*
 ================
 R_RenderFace
@@ -435,6 +490,58 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 	{
 		r_outofedges += fa->numedges;
 		return;
+	}
+
+	if (pe_face && !insubmodel)
+	{
+		/* The engine clips and projects the whole face (FACE). The mip level wants
+		   the nearest 1/z, no nearer than z = 1: the nearest vertex. With
+		   pe_faceclip, as the CPU path, of the visible part: if the nearest vertex
+		   is off the screen, the face is clipped here. That changes mip levels as
+		   walls cross the screen edge, so more surfaces get rebuilt. */
+		const unsigned	vmask = clipflags & 15;
+		unsigned	outside = vmask;	/* screen planes every vertex is behind */
+		const float	*near = NULL;
+		float		zmin = 1e30f;
+
+		for (i = 0; i < fa->numedges; i++)
+		{
+			const int lindex = currententity->model->surfedges[fa->firstedge + i];
+			const medge_t *e = &currententity->model->edges[lindex > 0 ? lindex : -lindex];
+			const float *pos = r_pcurrentvertbase[lindex > 0 ? e->v[0] : e->v[1]].position;
+			const float z = (pos[0] - modelorg[0]) * vpn[0] + (pos[1] - modelorg[1]) * vpn[1] +
+				(pos[2] - modelorg[2]) * vpn[2];
+
+			if (z < zmin)
+			{
+				zmin = z;
+				near = pos;
+			}
+			for (unsigned k = 0; k < 4; k++)
+			{
+				if ((outside & (1u << k)) &&
+					DotProduct(pos, view_clipplanes[k].normal) - view_clipplanes[k].dist >= 0)
+					outside &= ~(1u << k);
+			}
+		}
+		if (outside || !near)
+			return;	/* entirely off the screen */
+		for (unsigned k = 0; pe_faceclip && k < 4; k++)
+		{
+			if ((vmask & (1u << k)) &&
+				DotProduct(near, view_clipplanes[k].normal) - view_clipplanes[k].dist < 0)
+			{
+				zmin = R_FaceClipZ (currententity->model, fa, vmask);
+				if (zmin >= 1e30f)
+					return;
+				break;
+			}
+		}
+		r_nearzi = 1.0f / (zmin < 1.0f ? 1.0f : zmin);
+		c_faceclip++;
+		surface_p->pe_first = 0;
+		surface_p->pe_count = -1;
+		goto post;
 	}
 
 	c_faceclip++;
@@ -582,8 +689,9 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 		return;
 	}
 
-	r_polycount++;
 	surface_p->pe_count = pe_numsurfedges - surface_p->pe_first;
+post:
+	r_polycount++;
 
 	surface_p->data = (void *)fa;
 	surface_p->nearzi = r_nearzi;

@@ -33,7 +33,9 @@ enum {
 	PE_POLY = 8,
 	PE_FILL = 9,
 	PE_LITSURF = 10,
-	PE_DEFER = 11
+	PE_DEFER = 11,
+	PE_VIEW = 17,
+	PE_FACE = 18
 };
 
 enum {
@@ -68,6 +70,8 @@ extern unsigned pe_submitted;
 extern unsigned pe_synced;
 extern unsigned pe_spans_fence;
 extern qboolean pe_world;
+extern qboolean pe_face;	/* world faces go out whole, as FACE (version 10) */
+extern qboolean pe_faceclip;	/* FACE mip levels from the face clipped to the screen */
 extern qboolean pe_sprites;	/* sprites as SPRITE commands (version 11) */
 extern qboolean pe_guard_models;
 extern qboolean pe_defer_builds;

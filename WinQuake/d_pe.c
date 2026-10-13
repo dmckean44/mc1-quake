@@ -12,6 +12,8 @@ unsigned	pe_submitted;
 unsigned	pe_synced;
 unsigned	pe_spans_fence;
 qboolean	pe_world;
+qboolean	pe_face;
+qboolean	pe_faceclip;
 qboolean	pe_guard_models;
 qboolean	pe_sprites;
 int		pe_version;
@@ -27,6 +29,7 @@ volatile unsigned	pe_noreg;
 static cvar_t	r_pe = {"r_pe", "2"};
 static cvar_t	r_peguard = {"r_peguard", "1"};
 static cvar_t	r_pesprite = {"r_pesprite", "1"};
+static cvar_t	r_pefaceclip = {"r_pefaceclip", "0"};
 static const byte	*pe_skin;
 static int	pe_skinwidth;
 
@@ -43,6 +46,7 @@ void PE_Init (void)
 	Cvar_RegisterVariable (&r_pe);
 	Cvar_RegisterVariable (&r_peguard);
 	Cvar_RegisterVariable (&r_pesprite);
+	Cvar_RegisterVariable (&r_pefaceclip);
 #if defined(MC1)
 	pe_present = (PE_REG(PE_ID) >> 16) == PE_ID_MAGIC;
 	pe_version = PE_REG(PE_ID) & 0xffff;
@@ -90,6 +94,33 @@ void PE_BeginFrame (void)
 		PE_Word (r_refdef.vrectbottom);
 		PE_Word (20);
 	}
+
+	pe_face = pe_world && pe_version >= 10;
+	pe_faceclip = r_pefaceclip.value != 0;
+	if (pe_face)
+	{
+		const float	cx = xcenter, cy = ycenter;
+		int	i;
+
+		/* the camera for FACE, and the guard rectangle it clips to */
+		PE_Begin (PE_VIEW, 20);
+		for (i = 0; i < 3; i++)
+			PE_Float (r_origin[i]);
+		for (i = 0; i < 3; i++)
+			PE_Float (vright[i]);
+		for (i = 0; i < 3; i++)
+			PE_Float (vup[i]);
+		for (i = 0; i < 3; i++)
+			PE_Float (vpn[i]);
+		PE_Float (xcenter);
+		PE_Float (ycenter);
+		PE_Float (xscale);
+		PE_Float (yscale);
+		PE_Float (cx - PE_GUARD * (cx - r_refdef.vrect.x));
+		PE_Float (cy - PE_GUARD * (cy - r_refdef.vrect.y));
+		PE_Float (cx + PE_GUARD * (r_refdef.vrectright - cx));
+		PE_Float (cy + PE_GUARD * (r_refdef.vrectbottom - cy));
+	}
 }
 
 void PE_SetSkin (const byte *skin, int skinwidth)
@@ -119,6 +150,21 @@ int PE_BeginSurf (surf_t *s, int flags)
 		PE_Begin (PE_FILL, 21);
 		PE_Word (flags);
 		PE_Word (0);
+		return 0;
+	}
+	if (s->pe_count < 0)
+	{
+		/* a whole world face: the engine clips and projects it (FACE) */
+		const msurface_t *fa = (const msurface_t *) s->data;
+
+		PE_Begin (PE_FACE, 26);
+		PE_Word (flags);
+		PE_Ptr (cl.worldmodel->vertexes);
+		PE_Ptr (cl.worldmodel->surfedges);
+		PE_Ptr (cl.worldmodel->edges);
+		PE_Word (sizeof(medge_t));
+		PE_Word (fa->firstedge);
+		PE_Word (fa->numedges);
 		return 0;
 	}
 	PE_Begin (PE_POLY, 21 + 3 * s->pe_count);
