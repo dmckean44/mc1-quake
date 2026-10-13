@@ -13,6 +13,7 @@ unsigned	pe_synced;
 unsigned	pe_spans_fence;
 qboolean	pe_world;
 qboolean	pe_guard_models;
+qboolean	pe_sprites;
 int		pe_version;
 pe_surfedge_t	*pe_surfedges;
 int		pe_numsurfedges;
@@ -25,6 +26,7 @@ volatile unsigned	pe_noreg;
 /* 1: spans, 2: world faces as polygons (stage B) */
 static cvar_t	r_pe = {"r_pe", "2"};
 static cvar_t	r_peguard = {"r_peguard", "1"};
+static cvar_t	r_pesprite = {"r_pesprite", "1"};
 static const byte	*pe_skin;
 static int	pe_skinwidth;
 
@@ -40,6 +42,7 @@ void PE_Init (void)
 {
 	Cvar_RegisterVariable (&r_pe);
 	Cvar_RegisterVariable (&r_peguard);
+	Cvar_RegisterVariable (&r_pesprite);
 #if defined(MC1)
 	pe_present = (PE_REG(PE_ID) >> 16) == PE_ID_MAGIC;
 	pe_version = PE_REG(PE_ID) & 0xffff;
@@ -59,6 +62,7 @@ void PE_BeginFrame (void)
 			!r_draworder.value && !r_drawflat.value;
 	/* the engine clips to the screen: models that only leave it are drawn unclipped */
 	pe_guard_models = pe_world && r_peguard.value;
+	pe_sprites = pe_active && pe_version >= 11 && r_pesprite.value;
 	if (!pe_active)
 		return;
 

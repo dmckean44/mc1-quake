@@ -387,15 +387,64 @@ void D_SpriteCalculateGradients (void)
 D_DrawSprite
 =====================
 */
+/* Sprite span lists drawn by the engine: each sprite gets its own part of the
+   pool, which is only reused from the start once the engine is done with the
+   last sprite. */
+#define SPRITE_POOL	(4 * (MAXHEIGHT + 1))
+static sspan_t	sprite_pool[SPRITE_POOL];
+static int	sprite_next;
+static unsigned	sprite_fence;
+
+static sspan_t *D_SpriteSpans (void)
+{
+	if (sprite_next + MAXHEIGHT + 1 > SPRITE_POOL)
+	{
+		PE_WaitFor (sprite_fence);
+		sprite_next = 0;
+	}
+	return &sprite_pool[sprite_next];
+}
+
+static void D_SendSprite (sspan_t *spans)
+{
+	sspan_t	*end = spans;
+
+	while (end->count != DS_SPAN_LIST_END)
+		end++;
+	sprite_next += end - spans + 1;
+	sprite_fence = PE_Begin (PE_SPRITE, 19);
+	PE_Ptr (spans);
+	PE_Ptr (cacheblock);
+	PE_Word (cachewidth);
+	PE_Word (sadjust);
+	PE_Word (tadjust);
+	PE_Word (bbextents);
+	PE_Word (bbextentt);
+	PE_Float (d_sdivzorigin);
+	PE_Float (d_sdivzstepu);
+	PE_Float (d_sdivzstepv);
+	PE_Float (d_tdivzorigin);
+	PE_Float (d_tdivzstepu);
+	PE_Float (d_tdivzstepv);
+	PE_Float (d_ziorigin);
+	PE_Float (d_zistepu);
+	PE_Float (d_zistepv);
+	PE_Word (16);	/* Quake sprite: opaque, 8-pixel spanlets, no Z writes */
+	PE_Word (0);
+	PE_Word (0);
+}
+
 void D_DrawSprite (void)
 {
-	PE_Finish ();
 	int			i, nump;
 	float		ymin, ymax;
 	emitpoint_t	*pverts;
 	sspan_t		spans[MAXHEIGHT+1];
+	const qboolean	engine = pe_sprites;
 
-	sprite_spans = spans;
+	if (!engine)
+		PE_Finish ();
+	sprite_spans = engine ? D_SpriteSpans () : spans;
 
 // find the top and bottom vertices, and make sure there's at least one scan to
 // draw
@@ -439,6 +488,9 @@ void D_DrawSprite (void)
 	D_SpriteCalculateGradients ();
 	D_SpriteScanLeftEdge ();
 	D_SpriteScanRightEdge ();
-	D_SpriteDrawSpans (sprite_spans);
+	if (engine)
+		D_SendSprite (sprite_spans);
+	else
+		D_SpriteDrawSpans (sprite_spans);
 }
 
