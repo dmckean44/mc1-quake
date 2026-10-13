@@ -101,10 +101,15 @@ if(MC1)
          -msim
     )
   endif()
+  # MC1_SOUND: the real mixer into a memory ring buffer (snd_mc1.c), to measure its cost
+  if(MC1_SOUND)
+    list(APPEND SRCS snd_dma.c snd_mem.c snd_mix.c snd_mc1.c)
+  else()
+    list(APPEND SRCS snd_null.c)
+  endif()
   list(APPEND SRCS
        in_mc1.c
        net_none.c
-       snd_null.c
        sys_mc1.c
        fastmath_mc1.c
        vid_mc1.c
