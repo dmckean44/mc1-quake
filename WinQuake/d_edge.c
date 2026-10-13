@@ -220,7 +220,7 @@ static void D_DrawSurface (surf_t *s)
 
 	if (s->flags & SURF_DRAWSKY)
 	{
-		if (!r_skymade)
+		if (!r_skymade && !(pe_active && pe_version >= 12))
 		{
 			R_MakeSky ();
 		}

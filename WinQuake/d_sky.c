@@ -148,6 +148,8 @@ builds is linear in u and v, so it goes out as three gradients (the engine
 normalizes with the fast inverse square root).
 =================
 */
+extern byte	bottomsky[128*131];
+
 void PE_DrawSky (surf_t *s)
 {
 	int	i, n;
@@ -162,8 +164,17 @@ void PE_DrawSky (surf_t *s)
 	PE_Word (256);
 	PE_Float (skytime * skyspeed);
 	PE_Float (6 * (SKYSIZE / 2 - 1));
-	PE_Word (0);
-	PE_Word (0);
+	if (pe_version >= 12)
+	{
+		/* the engine lays the front layer over the back one, as R_MakeSky */
+		PE_Ptr (bottomsky);
+		PE_Word ((int)(skytime * skyspeed));
+	}
+	else
+	{
+		PE_Word (0);
+		PE_Word (0);
+	}
 	for (i = 0; i < 3; i++)
 	{
 		float	z = (i == 2) ? 3 : 1;	/* D_Sky_uv_To_st flattens the sky */
