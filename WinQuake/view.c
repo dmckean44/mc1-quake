@@ -654,27 +654,33 @@ void V_UpdatePalette (void)
 	if (!new && !force)
 		return;
 			
-	basepal = host_basepal;
-	newpal = pal;
-	
-	for (i=0 ; i<256 ; i++)
+	/* each channel only depends on itself: build its ramp once, with the
+	   shifts that are active, instead of applying them to every colour */
 	{
-		r = basepal[0];
-		g = basepal[1];
-		b = basepal[2];
-		basepal += 3;
-	
-		for (j=0 ; j<NUM_CSHIFTS ; j++)	
+		byte	ramp[3][256];
+		int	c, v, x, active[NUM_CSHIFTS], nactive = 0;
+
+		for (j = 0; j < NUM_CSHIFTS; j++)
+			if (cl.cshifts[j].percent)
+				active[nactive++] = j;
+		for (c = 0; c < 3; c++)
 		{
-			r += (cl.cshifts[j].percent*(cl.cshifts[j].destcolor[0]-r))>>8;
-			g += (cl.cshifts[j].percent*(cl.cshifts[j].destcolor[1]-g))>>8;
-			b += (cl.cshifts[j].percent*(cl.cshifts[j].destcolor[2]-b))>>8;
+			for (v = 0; v < 256; v++)
+			{
+				x = v;
+				for (j = 0; j < nactive; j++)
+					x += (cl.cshifts[active[j]].percent * (cl.cshifts[active[j]].destcolor[c] - x)) >> 8;
+				ramp[c][v] = gammatable[x];
+			}
 		}
-		
-		newpal[0] = gammatable[r];
-		newpal[1] = gammatable[g];
-		newpal[2] = gammatable[b];
-		newpal += 3;
+		basepal = host_basepal;
+		newpal = pal;
+		for (i = 0; i < 256; i++, basepal += 3, newpal += 3)
+		{
+			newpal[0] = ramp[0][basepal[0]];
+			newpal[1] = ramp[1][basepal[1]];
+			newpal[2] = ramp[2][basepal[2]];
+		}
 	}
 
 	VID_ShiftPalette (pal);	
