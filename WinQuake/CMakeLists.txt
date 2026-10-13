@@ -72,8 +72,14 @@ set(SRCS
 
 if(MC1)
   list(APPEND DEFS -DMC1)
-  list(APPEND OPTS -mcmodel=small -flto)
-  list(APPEND LIBS m -flto)
+  # MC1_PROFILE: no LTO and no single-call inlining, for per-function profiles
+  if(MC1_PROFILE)
+    list(APPEND OPTS -mcmodel=small -fno-inline-functions-called-once -fno-inline-small-functions)
+    list(APPEND LIBS m)
+  else()
+    list(APPEND OPTS -mcmodel=small -flto)
+    list(APPEND LIBS m -flto)
+  endif()
   if(MC1SDK_HOME)
     message("Building for running on an MC1 computer.")
     list(APPEND DEFS

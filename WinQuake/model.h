@@ -118,6 +118,9 @@ typedef struct msurface_s
 	short		texturemins[2];
 	short		extents[2];
 
+	float		boxcenter[3];	// bounding box of the vertices, for FACE
+	float		boxhalf[3];
+
 	mtexinfo_t	*texinfo;
 	
 // lighting info

@@ -495,15 +495,39 @@ void R_RenderFace (msurface_t *fa, int clipflags)
 	if (pe_face)
 	{
 		/* The engine clips and projects the whole face (FACE). The mip level wants
-		   the nearest 1/z, no nearer than z = 1: the nearest vertex. With
-		   pe_faceclip, as the CPU path, of the visible part: if the nearest vertex
-		   is off the screen, the face is clipped here. That changes mip levels as
-		   walls cross the screen edge, so more surfaces get rebuilt. */
+		   the nearest 1/z, no nearer than z = 1: by default from the bounding box.
+		   With pe_faceclip, as the CPU path, of the visible part: the nearest vertex,
+		   and if that is off the screen, the face is clipped here. That changes mip
+		   levels as walls cross the screen edge, so more surfaces get rebuilt. */
 		const unsigned	vmask = clipflags & 15;
 		unsigned	outside = vmask;	/* screen planes every vertex is behind */
 		const float	*near = NULL;
 		float		zmin = 1e30f;
 
+		if (!pe_faceclip)
+		{
+			/* the face's bounding box instead of its vertices: the nearest
+			   corner (the nearest vertex for axis-aligned rectangles) and a
+			   box-plane test for the screen edges */
+			const float	*c = fa->boxcenter, *h = fa->boxhalf;
+
+			for (unsigned k = 0; k < 4; k++)
+			{
+				const float *n = view_clipplanes[k].normal;
+
+				if ((vmask & (1u << k)) && DotProduct(c, n) - view_clipplanes[k].dist +
+					fabsf(n[0]) * h[0] + fabsf(n[1]) * h[1] + fabsf(n[2]) * h[2] < 0)
+					return;	/* entirely off the screen */
+			}
+			zmin = (c[0] - modelorg[0]) * vpn[0] + (c[1] - modelorg[1]) * vpn[1] +
+				(c[2] - modelorg[2]) * vpn[2] -
+				(fabsf(vpn[0]) * h[0] + fabsf(vpn[1]) * h[1] + fabsf(vpn[2]) * h[2]);
+			r_nearzi = 1.0f / (zmin < 1.0f ? 1.0f : zmin);
+			c_faceclip++;
+			surface_p->pe_first = 0;
+			surface_p->pe_count = -1;
+			goto post;
+		}
 		for (i = 0; i < fa->numedges; i++)
 		{
 			const int lindex = currententity->model->surfedges[fa->firstedge + i];
